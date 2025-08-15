@@ -64,14 +64,15 @@ func (m *DetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *DetailModel) View() string {
-	var s strings.Builder
+	var content strings.Builder
+	var fullView strings.Builder
 
-	// Title
+	// Title (outside the border)
 	title := fmt.Sprintf("🔍 Role: %s", m.role.Name)
-	s.WriteString(styles.TitleStyle.Render(title))
-	s.WriteString("\n\n")
+	fullView.WriteString(styles.TitleStyle.Render(title))
+	fullView.WriteString("\n")
 
-	// Tabs
+	// Tabs (outside the border, just above it)
 	var tabs []string
 	for i, tab := range m.tabs {
 		if i == m.activeTab {
@@ -80,25 +81,33 @@ func (m *DetailModel) View() string {
 			tabs = append(tabs, styles.InactiveTab.Render(tab))
 		}
 	}
-	s.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, tabs...))
-	s.WriteString("\n\n")
+	fullView.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, tabs...))
+	fullView.WriteString("\n")
 
-	// Content based on active tab
-	content := ""
+	// Content based on active tab (inside the border)
+	tabContent := ""
 	switch m.activeTab {
 	case 0: // Overview
-		content = m.renderOverview()
+		tabContent = m.renderOverview()
 	case 1: // Trust Policy
-		content = m.renderTrustPolicy()
+		tabContent = m.renderTrustPolicy()
 	case 2: // Policies
-		content = m.renderPolicies()
+		tabContent = m.renderPolicies()
 	case 3: // Tags
-		content = m.renderTags()
+		tabContent = m.renderTags()
 	}
 
 	// Apply scrolling
-	lines := strings.Split(content, "\n")
-	visibleHeight := m.height - 10
+	lines := strings.Split(tabContent, "\n")
+	
+	// Calculate visible height accounting for border
+	borderHeight := 4
+	titleHeight := 2
+	tabHeight := 2
+	statusHeight := 2
+	helpHeight := 1
+	
+	visibleHeight := m.height - borderHeight - titleHeight - tabHeight - statusHeight - helpHeight - 2
 	if visibleHeight < 5 {
 		visibleHeight = 5
 	}
@@ -110,31 +119,45 @@ func (m *DetailModel) View() string {
 
 	for i := m.scrollY; i < endIdx; i++ {
 		if i < len(lines) {
-			s.WriteString(lines[i])
-			s.WriteString("\n")
+			content.WriteString(lines[i])
+			content.WriteString("\n")
 		}
 	}
 
-	// Fill empty space
+	// Calculate available width
+	availableWidth := m.width - 6 // Account for border and padding
+	if availableWidth < 80 {
+		availableWidth = 80
+	}
+	
+	// Fill empty space inside the border with full width lines
 	for i := endIdx - m.scrollY; i < visibleHeight; i++ {
-		s.WriteString("\n")
+		content.WriteString(strings.Repeat(" ", availableWidth))
+		content.WriteString("\n")
 	}
 
-	// Status bar
-	s.WriteString("\n")
-	s.WriteString(styles.RenderStatusBar(m.profile, m.region, 1))
-	s.WriteString("\n")
+	// Calculate container height
+	containerHeight := visibleHeight
+	
+	// Apply the border container to the content with dynamic sizing
+	borderedContent := styles.GetMainContainer(m.width, containerHeight).Render(strings.TrimRight(content.String(), "\n"))
+	fullView.WriteString(borderedContent)
+	fullView.WriteString("\n")
 
-	// Help
+	// Status bar (outside the border) with full width
+	fullView.WriteString(styles.RenderStatusBar(m.profile, m.region, 1, m.width))
+	fullView.WriteString("\n")
+
+	// Help (outside the border)
 	help := []string{
 		styles.HelpKey.Render("Tab/l") + " " + styles.HelpDesc.Render("next tab"),
 		styles.HelpKey.Render("Shift+Tab/h") + " " + styles.HelpDesc.Render("prev tab"),
 		styles.HelpKey.Render("j/k") + " " + styles.HelpDesc.Render("scroll"),
 		styles.HelpKey.Render("Esc") + " " + styles.HelpDesc.Render("back"),
 	}
-	s.WriteString(styles.HelpStyle.Render(strings.Join(help, " | ")))
+	fullView.WriteString(styles.HelpStyle.Render(strings.Join(help, " | ")))
 
-	return s.String()
+	return fullView.String()
 }
 
 func (m *DetailModel) renderOverview() string {

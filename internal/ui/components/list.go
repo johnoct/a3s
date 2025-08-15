@@ -27,6 +27,10 @@ type ListModel struct {
 }
 
 func NewListModel(roles []iam.Role, profile, region string) ListModel {
+	return NewListModelWithSize(roles, profile, region, 80, 24)
+}
+
+func NewListModelWithSize(roles []iam.Role, profile, region string, width, height int) ListModel {
 	ti := textinput.New()
 	ti.Placeholder = "Search roles..."
 	ti.CharLimit = 100
@@ -37,6 +41,8 @@ func NewListModel(roles []iam.Role, profile, region string) ListModel {
 		searchInput:   ti,
 		profile:       profile,
 		region:        region,
+		width:         width,
+		height:        height,
 	}
 
 	return m
@@ -52,6 +58,12 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Handle detail view updates
 	if m.showDetail && m.detailView != nil {
 		switch msg := msg.(type) {
+		case tea.WindowSizeMsg:
+			// Pass window size to detail view
+			var detailModel tea.Model
+			detailModel, cmd = m.detailView.Update(msg)
+			m.detailView = detailModel.(*DetailModel)
+			return m, cmd
 		case tea.KeyMsg:
 			if msg.String() == "esc" || msg.String() == "q" {
 				m.showDetail = false
@@ -117,6 +129,8 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.filteredRoles) > 0 && m.cursor < len(m.filteredRoles) {
 				m.selectedRole = &m.filteredRoles[m.cursor]
 				m.detailView = NewDetailModel(m.selectedRole, m.profile, m.region)
+				// Set the window size for detail view
+				m.detailView.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 				m.showDetail = true
 				return m, m.detailView.Init()
 			}
@@ -154,31 +168,58 @@ func (m ListModel) View() string {
 		return m.detailView.View()
 	}
 
-	var s strings.Builder
+	var content strings.Builder
+	var fullView strings.Builder
 
-	// Title
-	s.WriteString(styles.TitleStyle.Render("🚀 a3s - AWS IAM Roles"))
-	s.WriteString("\n\n")
+	// Title (outside the border)
+	fullView.WriteString(styles.TitleStyle.Render("🚀 a3s - AWS IAM Roles"))
+	fullView.WriteString("\n")
 
-	// Search bar (if in search mode)
+	// Search bar (if in search mode) - outside the border
 	if m.searchMode {
-		s.WriteString(styles.SearchPrompt.Render("Search: "))
-		s.WriteString(m.searchInput.View())
-		s.WriteString("\n\n")
+		fullView.WriteString(styles.SearchPrompt.Render("Search: "))
+		fullView.WriteString(m.searchInput.View())
+		fullView.WriteString("\n")
 	}
 
-	// Column headers
-	headers := fmt.Sprintf("%-40s %-20s %-20s %s",
-		"Role Name",
-		"Created",
-		"Last Used",
+	// Calculate column widths based on terminal width
+	availableWidth := m.width - 6 // Account for border and padding
+	if availableWidth < 80 {
+		availableWidth = 80
+	}
+	
+	// Distribute width with fixed spacing between columns
+	// Using fixed column widths with proper spacing
+	roleWidth := 40
+	createdWidth := 12
+	lastUsedWidth := 12
+	// Calculate remaining space for description
+	descWidth := availableWidth - roleWidth - createdWidth - lastUsedWidth - 3 // 3 spaces between columns
+	if descWidth < 20 {
+		descWidth = 20
+	}
+	
+	// Column headers (inside the border)
+	headers := fmt.Sprintf("%-*s %-*s %-*s %s",
+		roleWidth, "Role Name",
+		createdWidth, "Created",
+		lastUsedWidth, "Last Used",
 		"Description",
 	)
-	s.WriteString(styles.ListHeader.Render(headers))
-	s.WriteString("\n")
+	content.WriteString(styles.ListHeader.Width(availableWidth).Render(headers))
+	content.WriteString("\n")
 
-	// Role list
-	visibleHeight := m.height - 10 // Account for headers, status bar, etc.
+	// Calculate visible height accounting for border
+	borderHeight := 4 // Border takes up space
+	titleHeight := 2
+	searchHeight := 0
+	if m.searchMode {
+		searchHeight = 2
+	}
+	statusHeight := 2
+	helpHeight := 1
+	
+	visibleHeight := m.height - borderHeight - titleHeight - searchHeight - statusHeight - helpHeight - 3
 	if visibleHeight < 5 {
 		visibleHeight = 5
 	}
@@ -192,6 +233,7 @@ func (m ListModel) View() string {
 		endIdx = len(m.filteredRoles)
 	}
 
+	// Role list (inside the border)
 	for i := startIdx; i < endIdx; i++ {
 		role := m.filteredRoles[i]
 		
@@ -201,40 +243,55 @@ func (m ListModel) View() string {
 			lastUsed = role.LastUsed.Format("2006-01-02")
 		}
 
-		description := role.Description
-		if len(description) > 40 {
-			description = description[:37] + "..."
-		}
+		// Truncate fields to exact column widths
+		roleName := truncate(role.Name, roleWidth-1) // -1 for spacing
+		createdStr := truncate(created, createdWidth-1)
+		lastUsedStr := truncate(lastUsed, lastUsedWidth-1)
+		description := truncate(role.Description, descWidth)
 
-		line := fmt.Sprintf("%-40s %-20s %-20s %s",
-			truncate(role.Name, 40),
-			created,
-			lastUsed,
+		// Build the line with exact spacing
+		line := fmt.Sprintf("%-*s %-*s %-*s %s",
+			roleWidth, roleName,
+			createdWidth, createdStr,
+			lastUsedWidth, lastUsedStr,
 			description,
 		)
 
+		// Ensure the entire line doesn't exceed available width
+		line = truncate(line, availableWidth)
+
 		if i == m.cursor {
-			s.WriteString(styles.SelectedItem.Render(line))
+			// Apply selection without padding to maintain alignment
+			content.WriteString(styles.SelectedItem.Render(line))
 		} else {
-			s.WriteString(styles.ListItem.Render(line))
+			// Regular items with padding
+			content.WriteString(styles.ListItem.Render(line))
 		}
-		s.WriteString("\n")
+		content.WriteString("\n")
 	}
 
-	// Fill empty space
+	// Fill empty space inside the border with full width lines
 	for i := endIdx - startIdx; i < visibleHeight; i++ {
-		s.WriteString("\n")
+		content.WriteString(strings.Repeat(" ", availableWidth))
+		content.WriteString("\n")
 	}
 
-	// Status bar
-	s.WriteString("\n")
-	s.WriteString(styles.RenderStatusBar(m.profile, m.region, len(m.filteredRoles)))
-	s.WriteString("\n")
+	// Calculate container height
+	containerHeight := visibleHeight + 2 // Content + header line
+	
+	// Apply the border container to the content with dynamic sizing
+	borderedContent := styles.GetMainContainer(m.width, containerHeight).Render(strings.TrimRight(content.String(), "\n"))
+	fullView.WriteString(borderedContent)
+	fullView.WriteString("\n")
 
-	// Help line
-	s.WriteString(styles.RenderHelp())
+	// Status bar (outside the border) with full width
+	fullView.WriteString(styles.RenderStatusBar(m.profile, m.region, len(m.filteredRoles), m.width))
+	fullView.WriteString("\n")
 
-	return s.String()
+	// Help line (outside the border)
+	fullView.WriteString(styles.RenderHelp())
+
+	return fullView.String()
 }
 
 func truncate(s string, max int) string {

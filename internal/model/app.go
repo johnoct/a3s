@@ -29,6 +29,10 @@ type App struct {
 }
 
 func NewApp(profile, region string) (*App, error) {
+	return NewAppWithSize(profile, region, 80, 24)
+}
+
+func NewAppWithSize(profile, region string, width, height int) (*App, error) {
 	ctx := context.Background()
 	
 	awsClient, err := client.New(ctx, profile, region)
@@ -40,6 +44,8 @@ func NewApp(profile, region string) (*App, error) {
 		state:       StateLoading,
 		awsClient:   awsClient,
 		roleService: iam.NewRoleService(awsClient),
+		width:       width,
+		height:      height,
 	}
 
 	return app, nil
@@ -54,7 +60,11 @@ type errorMsg struct {
 }
 
 func (a *App) Init() tea.Cmd {
-	return a.loadRoles()
+	// Return both loadRoles and a command to get window size
+	return tea.Batch(
+		a.loadRoles(),
+		tea.WindowSize(), // Request initial window size
+	)
 }
 
 func (a *App) loadRoles() tea.Cmd {
@@ -79,8 +89,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 
 	case rolesLoadedMsg:
-		a.listModel = components.NewListModel(msg.roles, a.awsClient.Profile, a.awsClient.Region)
-		a.listModel.Update(tea.WindowSizeMsg{Width: a.width, Height: a.height})
+		a.listModel = components.NewListModelWithSize(msg.roles, a.awsClient.Profile, a.awsClient.Region, a.width, a.height)
 		a.state = StateList
 		return a, a.listModel.Init()
 

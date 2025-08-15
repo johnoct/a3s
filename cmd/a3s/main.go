@@ -8,6 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/johnoct/a3s/internal/model"
+	"golang.org/x/term"
 )
 
 func main() {
@@ -35,12 +36,21 @@ func main() {
 		}
 	}
 
-	app, err := model.NewApp(*profile, *region)
+	// Get initial terminal size
+	width, height := 80, 24 // defaults
+	if w, h, err := term.GetSize(int(os.Stdout.Fd())); err == nil {
+		width, height = w, h
+	}
+
+	app, err := model.NewAppWithSize(*profile, *region, width, height)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	p := tea.NewProgram(app, tea.WithAltScreen())
+	p := tea.NewProgram(app, 
+		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(), // Enable mouse/resize events
+	)
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
 	}

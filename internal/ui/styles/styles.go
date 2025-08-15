@@ -47,6 +47,7 @@ var (
 	SelectedItem = BaseStyle.
 			Foreground(lipgloss.Color("#000000")).
 			Background(highlightColor).
+			PaddingLeft(1). // Same padding as ListItem for alignment
 			Bold(true)
 
 	// Status bar styles
@@ -130,10 +131,22 @@ var (
 	LoadingStyle = BaseStyle.
 			Foreground(accentColor).
 			Bold(true)
+
+	// Container with border (like k9s) - base style without width
+	MainContainer = BaseStyle.
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(accentColor).
+			Padding(0, 1)
 )
 
 // Helper functions
-func RenderStatusBar(profile, region string, itemCount int) string {
+func GetMainContainer(width, height int) lipgloss.Style {
+	return MainContainer.
+		Width(width - 2). // Account for terminal margins
+		Height(height)
+}
+
+func RenderStatusBar(profile, region string, itemCount int, width int) string {
 	left := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		StatusKey.Render("Profile:"),
@@ -144,7 +157,10 @@ func RenderStatusBar(profile, region string, itemCount int) string {
 
 	right := StatusValue.Render(fmt.Sprintf("%d items", itemCount))
 
-	width := 80 // We'll make this dynamic later
+	if width <= 0 {
+		width = 80 // Fallback width
+	}
+	
 	spaces := width - lipgloss.Width(left) - lipgloss.Width(right)
 	if spaces < 0 {
 		spaces = 0
