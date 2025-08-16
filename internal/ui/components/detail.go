@@ -12,15 +12,15 @@ import (
 )
 
 type DetailModel struct {
-	role       *iam.Role
-	profile    string
-	region     string
-	identity   *identity.Identity
-	width      int
-	height     int
-	scrollY    int
-	activeTab  int
-	tabs       []string
+	role      *iam.Role
+	profile   string
+	region    string
+	identity  *identity.Identity
+	width     int
+	height    int
+	scrollY   int
+	activeTab int
+	tabs      []string
 }
 
 func NewDetailModel(role *iam.Role, profile, region string) *DetailModel {
@@ -105,14 +105,14 @@ func (m *DetailModel) View() string {
 
 	// Apply scrolling
 	lines := strings.Split(tabContent, "\n")
-	
+
 	// Calculate visible height accounting for border
 	borderHeight := 4
 	titleHeight := 2
 	tabHeight := 2
 	statusHeight := 2
 	helpHeight := 1
-	
+
 	visibleHeight := m.height - borderHeight - titleHeight - tabHeight - statusHeight - helpHeight - 2
 	if visibleHeight < 5 {
 		visibleHeight = 5
@@ -135,7 +135,7 @@ func (m *DetailModel) View() string {
 	if availableWidth < 80 {
 		availableWidth = 80
 	}
-	
+
 	// Fill empty space inside the border with full width lines
 	for i := endIdx - m.scrollY; i < visibleHeight; i++ {
 		content.WriteString(strings.Repeat(" ", availableWidth))
@@ -144,7 +144,7 @@ func (m *DetailModel) View() string {
 
 	// Calculate container height
 	containerHeight := visibleHeight
-	
+
 	// Apply the border container to the content with dynamic sizing
 	borderedContent := styles.GetMainContainer(m.width, containerHeight).Render(strings.TrimRight(content.String(), "\n"))
 	fullView.WriteString(borderedContent)

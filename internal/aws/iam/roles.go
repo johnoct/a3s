@@ -165,12 +165,11 @@ func formatJSON(jsonStr string) string {
 	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
 		return jsonStr
 	}
-	
+
 	formatted, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return jsonStr
 	}
-	
+
 	return string(formatted)
 }
-

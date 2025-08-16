@@ -47,7 +47,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	p := tea.NewProgram(app, 
+	p := tea.NewProgram(app,
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(), // Enable mouse/resize events
 	)

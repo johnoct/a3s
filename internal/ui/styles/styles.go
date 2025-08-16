@@ -9,9 +9,9 @@ import (
 
 var (
 	// Colors
-	primaryColor   = lipgloss.Color("#FF9500")  // AWS Orange
-	secondaryColor = lipgloss.Color("#232F3E")  // AWS Dark Blue
-	accentColor    = lipgloss.Color("#146EB4")  // AWS Light Blue
+	primaryColor   = lipgloss.Color("#FF9500") // AWS Orange
+	secondaryColor = lipgloss.Color("#232F3E") // AWS Dark Blue
+	accentColor    = lipgloss.Color("#146EB4") // AWS Light Blue
 	successColor   = lipgloss.Color("#00C853")
 	warningColor   = lipgloss.Color("#FFA000")
 	errorColor     = lipgloss.Color("#D32F2F")
@@ -71,8 +71,8 @@ var (
 			Foreground(mutedColor)
 
 	HelpKey = BaseStyle.
-			Bold(true).
-			Foreground(accentColor)
+		Bold(true).
+		Foreground(accentColor)
 
 	HelpDesc = BaseStyle.
 			Foreground(mutedColor)
@@ -141,7 +141,8 @@ var (
 	// Header styles for k9s-like display
 	ASCIIArtStyle = BaseStyle.
 			Foreground(primaryColor).
-			Bold(true)
+			Bold(true).
+			Align(lipgloss.Right)
 
 	HeaderKey = BaseStyle.
 			Foreground(mutedColor)
@@ -172,7 +173,7 @@ func RenderStatusBar(profile, region string, itemCount int, width int) string {
 	if width <= 0 {
 		width = 80 // Fallback width
 	}
-	
+
 	spaces := width - lipgloss.Width(left) - lipgloss.Width(right)
 	if spaces < 0 {
 		spaces = 0

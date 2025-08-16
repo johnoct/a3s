@@ -36,7 +36,7 @@ func NewApp(profile, region string) (*App, error) {
 
 func NewAppWithSize(profile, region string, width, height int) (*App, error) {
 	ctx := context.Background()
-	
+
 	awsClient, err := client.New(ctx, profile, region)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create AWS client: %w", err)

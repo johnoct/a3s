@@ -13,20 +13,20 @@ import (
 )
 
 type ListModel struct {
-	roles          []iam.Role
-	filteredRoles  []iam.Role
-	cursor         int
-	searchMode     bool
-	searchInput    textinput.Model
-	width          int
-	height         int
-	profile        string
-	region         string
-	identity       *identity.Identity
-	selectedRole   *iam.Role
-	showDetail     bool
-	detailView     *DetailModel
-	err            error
+	roles         []iam.Role
+	filteredRoles []iam.Role
+	cursor        int
+	searchMode    bool
+	searchInput   textinput.Model
+	width         int
+	height        int
+	profile       string
+	region        string
+	identity      *identity.Identity
+	selectedRole  *iam.Role
+	showDetail    bool
+	detailView    *DetailModel
+	err           error
 }
 
 func NewListModel(roles []iam.Role, profile, region string) ListModel {
@@ -78,7 +78,7 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
-		
+
 		var detailModel tea.Model
 		detailModel, cmd = m.detailView.Update(msg)
 		m.detailView = detailModel.(*DetailModel)
@@ -181,6 +181,9 @@ func (m ListModel) View() string {
 	var content strings.Builder
 	var fullView strings.Builder
 
+	// Add top margin for better spacing
+	fullView.WriteString("\n")
+	
 	// Create header with ASCII art and AWS info
 	fullView.WriteString(m.renderHeader())
 	fullView.WriteString("\n")
@@ -197,7 +200,7 @@ func (m ListModel) View() string {
 	if availableWidth < 80 {
 		availableWidth = 80
 	}
-	
+
 	// Distribute width with fixed spacing between columns
 	// Using fixed column widths with proper spacing
 	roleWidth := 40
@@ -208,7 +211,7 @@ func (m ListModel) View() string {
 	if descWidth < 20 {
 		descWidth = 20
 	}
-	
+
 	// Column headers (inside the border)
 	headers := fmt.Sprintf("%-*s %-*s %-*s %s",
 		roleWidth, "Role Name",
@@ -221,15 +224,15 @@ func (m ListModel) View() string {
 
 	// Calculate visible height accounting for border and header
 	borderHeight := 4 // Border takes up space
-	headerHeight := 5 // Simplified ASCII art and identity info (3 lines + spacing)
+	headerHeight := 8 // ASCII art (6 lines) + top margin (1) + spacing (1)
 	searchHeight := 0
 	if m.searchMode {
 		searchHeight = 2
 	}
 	statusHeight := 2
 	helpHeight := 1
-	
-	visibleHeight := m.height - borderHeight - headerHeight - searchHeight - statusHeight - helpHeight - 2
+
+	visibleHeight := m.height - borderHeight - headerHeight - searchHeight - statusHeight - helpHeight - 1
 	if visibleHeight < 5 {
 		visibleHeight = 5
 	}
@@ -246,7 +249,7 @@ func (m ListModel) View() string {
 	// Role list (inside the border)
 	for i := startIdx; i < endIdx; i++ {
 		role := m.filteredRoles[i]
-		
+
 		created := role.CreateDate.Format("2006-01-02")
 		lastUsed := "Never"
 		if role.LastUsed != nil {
@@ -288,7 +291,7 @@ func (m ListModel) View() string {
 
 	// Calculate container height
 	containerHeight := visibleHeight + 2 // Content + header line
-	
+
 	// Apply the border container to the content with dynamic sizing
 	borderedContent := styles.GetMainContainer(m.width, containerHeight).Render(strings.TrimRight(content.String(), "\n"))
 	fullView.WriteString(borderedContent)
@@ -306,75 +309,101 @@ func (m ListModel) View() string {
 
 func (m ListModel) renderHeader() string {
 	var header strings.Builder
-	
+
 	// Simple and readable a3s logo
 	asciiArt := []string{
-		"   ╔═══╗ ═══ ╔═══╗",
-		"───╠═══╣ ══╗ ╚═══╗",
-		"   ╩   ╩ ══╝ ╚═══╝",
+		"        ____      ",
+		"       |___ \\     ",
+		"   __ _  __) |___ ",
+		"  / _` ||__ </ __|",
+		" | (_| |___) \\__ \\",
+		"  \\__,_|____/|___/",
 	}
 
 	// Format AWS identity information (left side, like k9s)
+	// Add padding to align with the main content border (2 spaces for border + 1 space for content padding)
+	leftPadding := "   " // 3 spaces to align with bordered content
 	var infoLines []string
 	if m.identity != nil {
 		infoLines = []string{
-			fmt.Sprintf("%s %s", styles.HeaderKey.Render("Account:"), styles.HeaderValue.Render(m.identity.Account)),
-			fmt.Sprintf("%s %s", styles.HeaderKey.Render("User:"), styles.HeaderValue.Render(m.identity.DisplayName)),
-			fmt.Sprintf("%s %s", styles.HeaderKey.Render("Region:"), styles.HeaderValue.Render(m.region)),
+			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Account:"), styles.HeaderValue.Render(m.identity.Account)),
+			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("User:"), styles.HeaderValue.Render(m.identity.DisplayName)),
+			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Region:"), styles.HeaderValue.Render(m.region)),
 		}
 		// Add profile if different from user
 		if m.profile != "" && m.profile != "default" {
-			infoLines = append(infoLines, fmt.Sprintf("%s %s", styles.HeaderKey.Render("Profile:"), styles.HeaderValue.Render(m.profile)))
+			infoLines = append(infoLines, fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Profile:"), styles.HeaderValue.Render(m.profile)))
 		}
 	} else {
 		infoLines = []string{
-			fmt.Sprintf("%s %s", styles.HeaderKey.Render("Profile:"), styles.HeaderValue.Render(m.profile)),
-			fmt.Sprintf("%s %s", styles.HeaderKey.Render("Region:"), styles.HeaderValue.Render(m.region)),
+			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Profile:"), styles.HeaderValue.Render(m.profile)),
+			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Region:"), styles.HeaderValue.Render(m.region)),
 		}
 	}
 
-	// Calculate right alignment for ASCII art
-	// Get terminal width for right alignment
-	rightOffset := m.width - 30 // Leave space for the ASCII art
-	if rightOffset < 50 {
-		rightOffset = 50
-	}
+	// Calculate dimensions for proper layout
+	asciiWidth := 18 // Actual width of the ASCII art (including spaces)
+	minSpacing := 8  // Minimum spacing between left content and ASCII art
 	
+	// Find the maximum width of left content for consistent spacing
+	maxLeftWidth := 0
+	for _, line := range infoLines {
+		if w := lipgloss.Width(line); w > maxLeftWidth {
+			maxLeftWidth = w
+		}
+	}
+
+	// Calculate available space and positioning
+	availableWidth := m.width - 4 // Account for terminal margins and border
+	totalRequiredWidth := maxLeftWidth + minSpacing + asciiWidth
+	
+	// If we have enough space, use optimal spacing; otherwise compress
+	var spacing int
+	if totalRequiredWidth <= availableWidth {
+		// We have enough space - distribute remaining space as padding
+		extraSpace := availableWidth - totalRequiredWidth
+		spacing = minSpacing + (extraSpace / 2) // Add half the extra space to spacing
+	} else {
+		// Terminal too narrow - use minimum spacing
+		spacing = minSpacing
+	}
+
 	// Combine info (left) and ASCII art (right) - matching k9s layout
 	maxLines := len(asciiArt)
 	if len(infoLines) > maxLines {
 		maxLines = len(infoLines)
 	}
-	
+
 	for i := 0; i < maxLines; i++ {
-		line := ""
-		
+		var line strings.Builder
+
 		// Left side - AWS info
 		if i < len(infoLines) {
-			line = infoLines[i]
+			line.WriteString(infoLines[i])
+			// Pad to consistent width for alignment
+			currentWidth := lipgloss.Width(infoLines[i])
+			if padding := maxLeftWidth - currentWidth; padding > 0 {
+				line.WriteString(strings.Repeat(" ", padding))
+			}
+		} else {
+			// Empty left side - pad to max width
+			line.WriteString(strings.Repeat(" ", maxLeftWidth))
 		}
-		
-		// Calculate spacing to right-align ASCII art
-		currentWidth := lipgloss.Width(line)
-		spacing := rightOffset - currentWidth
-		if spacing < 10 {
-			spacing = 10
-		}
-		
-		header.WriteString(line)
-		header.WriteString(strings.Repeat(" ", spacing))
-		
-		// Right side - ASCII art
+
+		// Add spacing
+		line.WriteString(strings.Repeat(" ", spacing))
+
+		// Right side - ASCII art (right-aligned within its space)
 		if i < len(asciiArt) {
-			header.WriteString(styles.ASCIIArtStyle.Render(asciiArt[i]))
+			artLine := styles.ASCIIArtStyle.Render(asciiArt[i])
+			line.WriteString(artLine)
 		}
-		
-		if i < maxLines-1 {
-			header.WriteString("\n")
-		}
+
+		header.WriteString(line.String())
+		header.WriteString("\n")
 	}
-	
-	return header.String()
+
+	return strings.TrimRight(header.String(), "\n")
 }
 
 func truncate(s string, max int) string {

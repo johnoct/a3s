@@ -18,7 +18,7 @@ type Identity struct {
 
 func GetCallerIdentity(ctx context.Context, awsClient *client.AWSClient) (*Identity, error) {
 	stsClient := sts.NewFromConfig(awsClient.Config)
-	
+
 	result, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get caller identity: %w", err)
