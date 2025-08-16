@@ -6,7 +6,9 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/johnoct/a3s/internal/aws/iam"
+	"github.com/johnoct/a3s/internal/aws/identity"
 	"github.com/johnoct/a3s/internal/ui/styles"
 )
 
@@ -20,6 +22,7 @@ type ListModel struct {
 	height         int
 	profile        string
 	region         string
+	identity       *identity.Identity
 	selectedRole   *iam.Role
 	showDetail     bool
 	detailView     *DetailModel
@@ -50,6 +53,10 @@ func NewListModelWithSize(roles []iam.Role, profile, region string, width, heigh
 
 func (m ListModel) Init() tea.Cmd {
 	return nil
+}
+
+func (m *ListModel) SetIdentity(id *identity.Identity) {
+	m.identity = id
 }
 
 func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -129,8 +136,11 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.filteredRoles) > 0 && m.cursor < len(m.filteredRoles) {
 				m.selectedRole = &m.filteredRoles[m.cursor]
 				m.detailView = NewDetailModel(m.selectedRole, m.profile, m.region)
-				// Set the window size for detail view
+				// Set the window size and identity for detail view
 				m.detailView.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+				if m.identity != nil {
+					m.detailView.SetIdentity(m.identity)
+				}
 				m.showDetail = true
 				return m, m.detailView.Init()
 			}
@@ -171,8 +181,8 @@ func (m ListModel) View() string {
 	var content strings.Builder
 	var fullView strings.Builder
 
-	// Title (outside the border)
-	fullView.WriteString(styles.TitleStyle.Render("🚀 a3s - AWS IAM Roles"))
+	// Create header with ASCII art and AWS info
+	fullView.WriteString(m.renderHeader())
 	fullView.WriteString("\n")
 
 	// Search bar (if in search mode) - outside the border
@@ -209,9 +219,9 @@ func (m ListModel) View() string {
 	content.WriteString(styles.ListHeader.Width(availableWidth).Render(headers))
 	content.WriteString("\n")
 
-	// Calculate visible height accounting for border
+	// Calculate visible height accounting for border and header
 	borderHeight := 4 // Border takes up space
-	titleHeight := 2
+	headerHeight := 5 // Simplified ASCII art and identity info (3 lines + spacing)
 	searchHeight := 0
 	if m.searchMode {
 		searchHeight = 2
@@ -219,7 +229,7 @@ func (m ListModel) View() string {
 	statusHeight := 2
 	helpHeight := 1
 	
-	visibleHeight := m.height - borderHeight - titleHeight - searchHeight - statusHeight - helpHeight - 3
+	visibleHeight := m.height - borderHeight - headerHeight - searchHeight - statusHeight - helpHeight - 2
 	if visibleHeight < 5 {
 		visibleHeight = 5
 	}
@@ -292,6 +302,79 @@ func (m ListModel) View() string {
 	fullView.WriteString(styles.RenderHelp())
 
 	return fullView.String()
+}
+
+func (m ListModel) renderHeader() string {
+	var header strings.Builder
+	
+	// Simple and readable a3s logo
+	asciiArt := []string{
+		"   ╔═══╗ ═══ ╔═══╗",
+		"───╠═══╣ ══╗ ╚═══╗",
+		"   ╩   ╩ ══╝ ╚═══╝",
+	}
+
+	// Format AWS identity information (left side, like k9s)
+	var infoLines []string
+	if m.identity != nil {
+		infoLines = []string{
+			fmt.Sprintf("%s %s", styles.HeaderKey.Render("Account:"), styles.HeaderValue.Render(m.identity.Account)),
+			fmt.Sprintf("%s %s", styles.HeaderKey.Render("User:"), styles.HeaderValue.Render(m.identity.DisplayName)),
+			fmt.Sprintf("%s %s", styles.HeaderKey.Render("Region:"), styles.HeaderValue.Render(m.region)),
+		}
+		// Add profile if different from user
+		if m.profile != "" && m.profile != "default" {
+			infoLines = append(infoLines, fmt.Sprintf("%s %s", styles.HeaderKey.Render("Profile:"), styles.HeaderValue.Render(m.profile)))
+		}
+	} else {
+		infoLines = []string{
+			fmt.Sprintf("%s %s", styles.HeaderKey.Render("Profile:"), styles.HeaderValue.Render(m.profile)),
+			fmt.Sprintf("%s %s", styles.HeaderKey.Render("Region:"), styles.HeaderValue.Render(m.region)),
+		}
+	}
+
+	// Calculate right alignment for ASCII art
+	// Get terminal width for right alignment
+	rightOffset := m.width - 30 // Leave space for the ASCII art
+	if rightOffset < 50 {
+		rightOffset = 50
+	}
+	
+	// Combine info (left) and ASCII art (right) - matching k9s layout
+	maxLines := len(asciiArt)
+	if len(infoLines) > maxLines {
+		maxLines = len(infoLines)
+	}
+	
+	for i := 0; i < maxLines; i++ {
+		line := ""
+		
+		// Left side - AWS info
+		if i < len(infoLines) {
+			line = infoLines[i]
+		}
+		
+		// Calculate spacing to right-align ASCII art
+		currentWidth := lipgloss.Width(line)
+		spacing := rightOffset - currentWidth
+		if spacing < 10 {
+			spacing = 10
+		}
+		
+		header.WriteString(line)
+		header.WriteString(strings.Repeat(" ", spacing))
+		
+		// Right side - ASCII art
+		if i < len(asciiArt) {
+			header.WriteString(styles.ASCIIArtStyle.Render(asciiArt[i]))
+		}
+		
+		if i < maxLines-1 {
+			header.WriteString("\n")
+		}
+	}
+	
+	return header.String()
 }
 
 func truncate(s string, max int) string {

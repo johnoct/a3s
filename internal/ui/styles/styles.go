@@ -137,6 +137,18 @@ var (
 			BorderStyle(lipgloss.RoundedBorder()).
 			BorderForeground(accentColor).
 			Padding(0, 1)
+
+	// Header styles for k9s-like display
+	ASCIIArtStyle = BaseStyle.
+			Foreground(primaryColor).
+			Bold(true)
+
+	HeaderKey = BaseStyle.
+			Foreground(mutedColor)
+
+	HeaderValue = BaseStyle.
+			Foreground(accentColor).
+			Bold(true)
 )
 
 // Helper functions

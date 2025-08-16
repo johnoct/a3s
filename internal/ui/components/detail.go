@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/johnoct/a3s/internal/aws/iam"
+	"github.com/johnoct/a3s/internal/aws/identity"
 	"github.com/johnoct/a3s/internal/ui/styles"
 )
 
@@ -14,6 +15,7 @@ type DetailModel struct {
 	role       *iam.Role
 	profile    string
 	region     string
+	identity   *identity.Identity
 	width      int
 	height     int
 	scrollY    int
@@ -32,6 +34,10 @@ func NewDetailModel(role *iam.Role, profile, region string) *DetailModel {
 
 func (m *DetailModel) Init() tea.Cmd {
 	return nil
+}
+
+func (m *DetailModel) SetIdentity(id *identity.Identity) {
+	m.identity = id
 }
 
 func (m *DetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

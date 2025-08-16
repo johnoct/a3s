@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/johnoct/a3s/internal/aws/client"
 	"github.com/johnoct/a3s/internal/aws/iam"
+	"github.com/johnoct/a3s/internal/aws/identity"
 	"github.com/johnoct/a3s/internal/ui/components"
 )
 
@@ -19,13 +20,14 @@ const (
 )
 
 type App struct {
-	state      State
-	awsClient  *client.AWSClient
+	state       State
+	awsClient   *client.AWSClient
 	roleService *iam.RoleService
-	listModel  components.ListModel
-	err        error
-	width      int
-	height     int
+	listModel   components.ListModel
+	identity    *identity.Identity
+	err         error
+	width       int
+	height      int
 }
 
 func NewApp(profile, region string) (*App, error) {
@@ -55,14 +57,19 @@ type rolesLoadedMsg struct {
 	roles []iam.Role
 }
 
+type identityLoadedMsg struct {
+	identity *identity.Identity
+}
+
 type errorMsg struct {
 	err error
 }
 
 func (a *App) Init() tea.Cmd {
-	// Return both loadRoles and a command to get window size
+	// Return batch of initialization commands
 	return tea.Batch(
 		a.loadRoles(),
+		a.loadIdentity(),
 		tea.WindowSize(), // Request initial window size
 	)
 }
@@ -78,6 +85,19 @@ func (a *App) loadRoles() tea.Cmd {
 	}
 }
 
+func (a *App) loadIdentity() tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		id, err := identity.GetCallerIdentity(ctx, a.awsClient)
+		if err != nil {
+			// Don't fail the app if we can't get identity
+			// Just return empty identity
+			return identityLoadedMsg{identity: nil}
+		}
+		return identityLoadedMsg{identity: id}
+	}
+}
+
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -90,8 +110,18 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case rolesLoadedMsg:
 		a.listModel = components.NewListModelWithSize(msg.roles, a.awsClient.Profile, a.awsClient.Region, a.width, a.height)
+		if a.identity != nil {
+			a.listModel.SetIdentity(a.identity)
+		}
 		a.state = StateList
 		return a, a.listModel.Init()
+
+	case identityLoadedMsg:
+		a.identity = msg.identity
+		if a.state == StateList {
+			a.listModel.SetIdentity(a.identity)
+		}
+		return a, nil
 
 	case errorMsg:
 		a.err = msg.err
