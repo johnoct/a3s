@@ -1,6 +1,7 @@
 package components
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -27,6 +28,8 @@ type ListModel struct {
 	showDetail    bool
 	detailView    *DetailModel
 	err           error
+	roleService   *iam.RoleService
+	loadingDetail bool
 }
 
 func NewListModel(roles []iam.Role, profile, region string) ListModel {
@@ -59,6 +62,29 @@ func (m *ListModel) SetIdentity(id *identity.Identity) {
 	m.identity = id
 }
 
+func (m *ListModel) SetRoleService(rs *iam.RoleService) {
+	m.roleService = rs
+}
+
+type roleDetailsLoadedMsg struct {
+	role *iam.Role
+}
+
+func (m *ListModel) loadRoleDetails(roleName string) tea.Cmd {
+	return func() tea.Msg {
+		if m.roleService == nil {
+			return nil
+		}
+		ctx := context.Background()
+		role, err := m.roleService.GetRoleDetails(ctx, roleName)
+		if err != nil {
+			// For now, return nil on error
+			return nil
+		}
+		return roleDetailsLoadedMsg{role: role}
+	}
+}
+
 func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
@@ -75,6 +101,7 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if msg.String() == "esc" || msg.String() == "q" {
 				m.showDetail = false
 				m.detailView = nil
+				m.loadingDetail = false
 				return m, nil
 			}
 		}
@@ -86,6 +113,20 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
+	case roleDetailsLoadedMsg:
+		m.loadingDetail = false
+		if msg.role != nil {
+			m.selectedRole = msg.role
+			m.detailView = NewDetailModel(m.selectedRole, m.profile, m.region)
+			// Set the window size and identity for detail view
+			m.detailView.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
+			if m.identity != nil {
+				m.detailView.SetIdentity(m.identity)
+			}
+			m.showDetail = true
+			return m, m.detailView.Init()
+		}
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -133,16 +174,10 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.searchInput.Focus()
 			return m, textinput.Blink
 		case "enter":
-			if len(m.filteredRoles) > 0 && m.cursor < len(m.filteredRoles) {
-				m.selectedRole = &m.filteredRoles[m.cursor]
-				m.detailView = NewDetailModel(m.selectedRole, m.profile, m.region)
-				// Set the window size and identity for detail view
-				m.detailView.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
-				if m.identity != nil {
-					m.detailView.SetIdentity(m.identity)
-				}
-				m.showDetail = true
-				return m, m.detailView.Init()
+			if len(m.filteredRoles) > 0 && m.cursor < len(m.filteredRoles) && !m.loadingDetail {
+				m.loadingDetail = true
+				roleName := m.filteredRoles[m.cursor].Name
+				return m, m.loadRoleDetails(roleName)
 			}
 		case "r":
 			// TODO: Implement refresh
@@ -176,6 +211,10 @@ func (m *ListModel) filterRoles() {
 func (m ListModel) View() string {
 	if m.showDetail && m.detailView != nil {
 		return m.detailView.View()
+	}
+
+	if m.loadingDetail {
+		return "\n  Loading role details... ⚡\n"
 	}
 
 	var content strings.Builder

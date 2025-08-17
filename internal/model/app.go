@@ -110,6 +110,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case rolesLoadedMsg:
 		a.listModel = components.NewListModelWithSize(msg.roles, a.awsClient.Profile, a.awsClient.Region, a.width, a.height)
+		a.listModel.SetRoleService(a.roleService)
 		if a.identity != nil {
 			a.listModel.SetIdentity(a.identity)
 		}
