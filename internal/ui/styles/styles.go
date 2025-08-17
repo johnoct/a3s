@@ -141,8 +141,7 @@ var (
 	// Header styles for k9s-like display
 	ASCIIArtStyle = BaseStyle.
 			Foreground(primaryColor).
-			Bold(true).
-			Align(lipgloss.Right)
+			Bold(true)
 
 	HeaderKey = BaseStyle.
 			Foreground(mutedColor)

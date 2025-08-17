@@ -341,9 +341,10 @@ func (m ListModel) renderHeader() string {
 		}
 	}
 
-	// Calculate dimensions for proper layout
-	asciiWidth := 18 // Actual width of the ASCII art (including spaces)
-	minSpacing := 8  // Minimum spacing between left content and ASCII art
+	// Calculate dimensions for proper k9s-style layout
+	asciiWidth := 18     // Actual width of the ASCII art
+	rightPadding := 4    // Padding from right edge (like k9s)
+	minSpacing := 12     // Increased minimum spacing for better separation
 	
 	// Find the maximum width of left content for consistent spacing
 	maxLeftWidth := 0
@@ -353,22 +354,25 @@ func (m ListModel) renderHeader() string {
 		}
 	}
 
-	// Calculate available space and positioning
-	availableWidth := m.width - 4 // Account for terminal margins and border
+	// Calculate available space (account for terminal width and right padding)
+	availableWidth := m.width - rightPadding
 	totalRequiredWidth := maxLeftWidth + minSpacing + asciiWidth
 	
-	// If we have enough space, use optimal spacing; otherwise compress
+	// Calculate spacing - prioritize right-alignment like k9s
 	var spacing int
 	if totalRequiredWidth <= availableWidth {
-		// We have enough space - distribute remaining space as padding
-		extraSpace := availableWidth - totalRequiredWidth
-		spacing = minSpacing + (extraSpace / 2) // Add half the extra space to spacing
+		// We have enough space - calculate spacing to right-align the ASCII art
+		spacing = availableWidth - maxLeftWidth - asciiWidth
+		// Ensure minimum spacing is maintained
+		if spacing < minSpacing {
+			spacing = minSpacing
+		}
 	} else {
-		// Terminal too narrow - use minimum spacing
+		// Terminal too narrow - use minimum spacing and let ASCII art overflow gracefully
 		spacing = minSpacing
 	}
 
-	// Combine info (left) and ASCII art (right) - matching k9s layout
+	// Combine info (left) and ASCII art (right) - k9s-style layout
 	maxLines := len(asciiArt)
 	if len(infoLines) > maxLines {
 		maxLines = len(infoLines)
@@ -390,11 +394,12 @@ func (m ListModel) renderHeader() string {
 			line.WriteString(strings.Repeat(" ", maxLeftWidth))
 		}
 
-		// Add spacing
+		// Add calculated spacing to position ASCII art properly
 		line.WriteString(strings.Repeat(" ", spacing))
 
-		// Right side - ASCII art (right-aligned within its space)
+		// Right side - ASCII art with consistent right alignment
 		if i < len(asciiArt) {
+			// Apply styling and ensure consistent positioning
 			artLine := styles.ASCIIArtStyle.Render(asciiArt[i])
 			line.WriteString(artLine)
 		}
