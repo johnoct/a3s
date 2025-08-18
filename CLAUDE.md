@@ -138,7 +138,7 @@ a3s/
 
 ## Rules
 - Always document progress when making significant changes in `.claude/docs/context_session_x.md` and read it before making more significant changes
-- Always use @agent-git-manager to push changes when asked to save and push
+- Always use @agent-claude-context-engineer to update Claude context and then use @agent-git-manager to push changes when asked to save and push
 - Follow existing code patterns and conventions
 - Maintain comprehensive error handling
 - Keep UI responsive with async operations
