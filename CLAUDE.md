@@ -1,144 +1,267 @@
-# CLAUDE.md
+# CLAUDE.md - Context Guide for Claude Code
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> **Context Engineering Note**: This file serves as Claude Code's primary project memory. It's structured to optimize Claude's comprehension and follows Claude Code memory management best practices. Each section provides progressive context building with clear hierarchical organization.
 
-## Project Overview
+## Project Identity & Status
 
 **a3s** is a terminal user interface (TUI) application for AWS resources, inspired by k9s (Kubernetes TUI). It provides a fast, keyboard-driven interface for viewing and managing AWS resources directly from the terminal.
 
-**Current Status**: MVP complete with IAM Role viewer featuring:
-- K9s-style header with AWS identity display and ASCII art logo
-- List view with search and filtering
-- Detailed role view with tabs (Overview, Trust Policy, Policies, Tags)
-- Async loading of role details including attached policies
-- Vim-like keyboard navigation
+**Current Development Phase**: MVP Complete - Production-Ready IAM Role Viewer
+**Status**: ✅ Fully functional with comprehensive IAM role management capabilities
 
-## Technology Stack
+### Core Features Delivered
+- K9s-inspired header with AWS identity display and ASCII art logo
+- Responsive list view with real-time search and filtering (`/` command)
+- Multi-tab detail view (Overview, Trust Policy, Policies, Tags)
+- Async role detail loading with loading indicators
+- Vim-like keyboard navigation (j/k, g/G, Tab, ESC, q)
+- Complete IAM policy display (managed + inline policies)
 
-- **Language**: Go
-- **TUI Framework**: Bubble Tea (github.com/charmbracelet/bubbletea)
-- **Styling**: Lipgloss (github.com/charmbracelet/lipgloss)
-- **AWS SDK**: AWS SDK for Go v2
-- **Architecture**: Model-View-Update pattern (Bubble Tea)
-- **Terminal Support**: golang.org/x/term for terminal size detection
+## Technology Stack & Dependencies
 
-## Development Setup
+**Primary Stack**:
+- **Language**: Go 1.24.2
+- **TUI Framework**: Bubble Tea v1.3.6 (github.com/charmbracelet/bubbletea)
+- **Styling Engine**: Lipgloss v1.1.0 (github.com/charmbracelet/lipgloss)
+- **AWS Integration**: AWS SDK for Go v2 (github.com/aws/aws-sdk-go-v2)
 
-```bash
-# Initialize Go module
-go mod init github.com/johnoct/a3s
+**Architecture Pattern**: Model-View-Update (Bubble Tea's Elm Architecture)
 
-# Install dependencies
-go get github.com/charmbracelet/bubbletea
-go get github.com/charmbracelet/lipgloss
-go get github.com/aws/aws-sdk-go-v2/config
-go get github.com/aws/aws-sdk-go-v2/service/iam
+**Key Dependencies**:
+```go
+// Core UI framework
+github.com/charmbracelet/bubbletea v1.3.6
+github.com/charmbracelet/lipgloss v1.1.0
+github.com/charmbracelet/bubbles v0.21.0
+
+// AWS integration
+github.com/aws/aws-sdk-go-v2 v1.38.0
+github.com/aws/aws-sdk-go-v2/config v1.31.0
+github.com/aws/aws-sdk-go-v2/service/iam v1.46.0
+github.com/aws/aws-sdk-go-v2/service/sts v1.37.0
 ```
 
-## Common Commands
+## Codebase Architecture & File Organization
 
-```bash
-# Run the application
-go run cmd/a3s/main.go
-
-# Build the application
-go build -o a3s cmd/a3s/main.go
-
-# Run tests
-go test ./...
-
-# Format code
-go fmt ./...
-
-# Lint code (after installing golangci-lint)
-golangci-lint run
+### Project Structure Map
 ```
-
-## Architecture Notes
-
-### Project Structure
-```
-a3s/
+a3s/                          # Root project directory
 ├── .claude/
-│   └── docs/         # Context session documentation
-├── cmd/
-│   └── a3s/          # Main application entry point
-├── internal/
-│   ├── aws/          # AWS SDK integration layer
-│   │   ├── iam/      # IAM-specific operations (roles.go)
-│   │   ├── identity/ # AWS identity management (STS)
-│   │   └── client/   # AWS client management
-│   ├── ui/           # Bubble Tea UI components
-│   │   ├── components/ # UI components (list.go, detail.go)
-│   │   └── styles/   # Lipgloss styles and themes
-│   └── model/        # Application state management (app.go)
+│   ├── docs/                 # Context session documentation (5 sessions)
+│   └── settings.local.json   # Local Claude Code settings
+├── cmd/a3s/                  # Application entry points
+│   ├── main.go              # Current main application
+│   └── main_old.go          # Legacy main (reference)
+├── internal/                 # Private application code
+│   ├── aws/                 # AWS SDK abstraction layer
+│   │   ├── client/          # AWS client configuration
+│   │   ├── iam/             # IAM service operations
+│   │   └── identity/        # STS identity management
+│   ├── model/               # Application state management
+│   │   └── app.go          # Main application model
+│   └── ui/                  # Bubble Tea UI layer
+│       ├── components/      # Reusable UI components
+│       │   ├── list.go     # Role list component
+│       │   └── detail.go   # Role detail component
+│       └── styles/          # Lipgloss styling
+├── bin/                     # Built binaries
+├── go.mod                   # Go module definition
+├── go.sum                   # Dependency checksums
+├── Makefile                 # Build automation
+└── README.md               # Public documentation
 ```
 
-### Key Design Patterns
+### Critical File Locations (for Claude Code navigation)
+- **Main Entry**: `/cmd/a3s/main.go`
+- **Core App Logic**: `/internal/model/app.go`
+- **UI Components**: `/internal/ui/components/{list.go,detail.go}`
+- **AWS Services**: `/internal/aws/{iam/roles.go,identity/identity.go,client/client.go}`
+- **Styling**: `/internal/ui/styles/styles.go`
+- **Context Documentation**: `/.claude/docs/context_session_*.md`
 
-1. **Bubble Tea Model-View-Update**:
-   - Each UI component implements `tea.Model` interface
-   - State changes through `Update()` method
-   - Rendering through `View()` method
-   - Async operations via tea.Cmd messages
+## Development Workflow & Commands
 
-2. **AWS Service Abstraction**:
-   - AWS SDK calls wrapped in service layer
-   - Pagination handled transparently
-   - Async loading of detailed role information
-   - Separate lightweight list vs detailed role fetching
+### Essential Commands (Priority Order)
+```bash
+# Development cycle
+go run cmd/a3s/main.go           # Run application directly
+make build                       # Build binary to bin/a3s
+make run                         # Build and run
+go test ./...                    # Run all tests
+go fmt ./...                     # Format code (always before commits)
 
-3. **Keyboard Navigation**:
-   - Vim-like bindings (j/k for up/down, g/G for top/bottom)
-   - Search with `/`
-   - Tab navigation in detail view
-   - ESC to go back, q to quit
+# Quality assurance
+golangci-lint run                # Lint code (install first)
+go mod tidy                      # Clean dependencies
+go vet ./...                     # Static analysis
+```
 
-## Important Resources
+### Build System
+- **Makefile present**: Use `make` commands for consistent builds
+- **Binary output**: `bin/a3s` (executable)
+- **Go version**: 1.24.2 (ensure compatibility)
 
-- **Bubble Tea Examples**: https://github.com/charmbracelet/bubbletea/tree/master/examples
-- **Lipgloss Documentation**: https://github.com/charmbracelet/lipgloss
-- **AWS SDK Go v2**: https://aws.github.io/aws-sdk-go-v2/docs/
-- **k9s (inspiration)**: https://github.com/derailed/k9s
+## Key Design Patterns & Implementation Details
 
-## Testing Approach
+### 1. Bubble Tea Architecture Implementation
+```go
+// Each UI component implements tea.Model interface
+type Model interface {
+    Init() Cmd
+    Update(Msg) (Model, Cmd)
+    View() string
+}
+```
 
-- Unit tests for AWS service layer
-- Component tests for UI elements
-- Integration tests with AWS using local credentials
-- Use table-driven tests for comprehensive coverage
+**Message Flow**: User Input → Update() → State Change → View() → UI Render
+**Async Operations**: Handled via `tea.Cmd` messages (critical for AWS API calls)
 
-## Features Implemented
+### 2. AWS Service Layer Pattern
+```go
+// Service abstraction in internal/aws/
+type RoleService struct {
+    client *iam.Client
+}
 
-### IAM Role Viewer
-- **List View**: Displays all IAM roles with columns for name, creation date, last used, and description
-- **Search**: Real-time filtering of roles with `/` command
-- **Detail View**: Multi-tab interface showing:
-  - Overview: Role ARN, ID, path, creation date, description, max session duration
-  - Trust Policy: Formatted JSON of trust relationships
-  - Policies: List of attached managed and inline policies (with async loading)
-  - Tags: Key-value pairs associated with the role
-- **Header**: K9s-style header showing AWS account, user, region, and profile with ASCII art logo
+// Key methods
+func (rs *RoleService) ListRoles() ([]Role, error)
+func (rs *RoleService) GetRoleDetails(roleName string) (*RoleDetails, error)
+```
 
-### UI Components
-- Dynamic terminal size detection and responsive layout
-- Color-coded interface with consistent styling
-- Loading indicators for async operations
-- Status bar showing current context and role count
-- Help text for keyboard shortcuts
+**Important**: Always use `GetRoleDetails()` for complete role information (includes policies, tags)
 
-## Next Steps / TODO
-- Add support for other AWS resources (EC2, S3, Lambda, etc.)
-- Implement refresh functionality (`r` key)
-- Add inline policy viewing/editing
-- Export functionality for role configurations
-- Add CloudTrail event viewing for roles
-- Implement command mode (`:` prefix commands)
-- Add configuration file support for custom settings
+### 3. Async Loading Pattern (Recently Implemented)
+- **Trigger**: User selects role (Enter key)
+- **Flow**: Loading indicator → AWS API call → Update UI with detailed data
+- **Implementation**: `roleDetailsLoadedMsg` message type in Bubble Tea pattern
 
-## Rules
-- Always document progress when making significant changes in `.claude/docs/context_session_x.md` and read it before making more significant changes
-- Always use @agent-claude-context-engineer to update Claude context and then use @agent-git-manager to push changes when asked to save and push
-- Follow existing code patterns and conventions
-- Maintain comprehensive error handling
-- Keep UI responsive with async operations
+### 4. UI State Management
+- **Navigation State**: Tracked in main app model
+- **Component State**: Each UI component manages its own state
+- **Loading States**: Explicit loading indicators for async operations
+
+## Recent Development History & Context
+
+### Session 5 (Latest): IAM Policy Display Fix
+**Problem Solved**: Roles showing "No policies attached" when policies existed
+**Root Cause**: Using `ListRoles()` basic data instead of `GetRoleDetails()`
+**Solution**: Implemented async role detail loading with proper AWS API integration
+
+**Key Changes**:
+- Enhanced `ListModel` with `roleService` dependency injection
+- Added `loadRoleDetails()` async command
+- Proper integration of detailed role data including policies
+
+### Critical Implementation Notes
+- **AWS API Strategy**: Two-tier loading (list → details on demand)
+- **Performance**: Async loading prevents UI blocking
+- **Error Handling**: Comprehensive error handling for AWS API failures
+
+## Testing Strategy & Quality Assurance
+
+### Test Structure
+```bash
+internal/
+├── aws/        # Unit tests for AWS service layer
+├── ui/         # Component tests for UI elements  
+└── model/      # Integration tests for app state
+```
+
+### Testing Approach
+- **Unit Tests**: AWS service layer with mocked AWS clients
+- **Component Tests**: UI components with mock data
+- **Integration Tests**: Full workflow with real AWS credentials
+- **Table-Driven Tests**: Comprehensive coverage for data transformations
+
+### Quality Standards
+- **Error Handling**: Always handle AWS API errors gracefully
+- **UI Responsiveness**: No blocking operations in UI thread
+- **Memory Management**: Proper cleanup of AWS resources
+- **Terminal Compatibility**: Support various terminal sizes and capabilities
+
+## Context Session Documentation System
+
+### Documentation Pattern
+- **Location**: `/.claude/docs/context_session_N.md`
+- **Purpose**: Track development progress and decisions
+- **Current Count**: 5 sessions (context_session_1.md through context_session_5.md)
+
+**Before making significant changes**, always:
+1. Read the latest context session for recent developments
+2. Document new changes in the next session file
+3. Update CLAUDE.md if architectural changes occur
+
+## Claude Code Interaction Guidelines
+
+### Preferred Development Approach
+1. **Always read latest context session** before making changes
+2. **Use existing patterns** - follow established conventions
+3. **Maintain async patterns** - keep UI responsive
+4. **Test incrementally** - run application after each change
+5. **Document progress** - update context sessions
+
+### File Navigation Priorities
+When asked to modify functionality:
+1. Start with `/internal/model/app.go` for app-level changes
+2. UI changes: `/internal/ui/components/{list.go,detail.go}`
+3. AWS integration: `/internal/aws/{iam,identity,client}/`
+4. Entry point: `/cmd/a3s/main.go`
+
+### Code Quality Expectations
+- **Idiomatic Go**: Follow Go best practices and conventions
+- **Error Handling**: Comprehensive error handling for all AWS operations
+- **UI Patterns**: Consistent with Bubble Tea patterns
+- **Performance**: Maintain async loading and responsive UI
+- **Documentation**: Comment complex logic and AWS integrations
+
+### Common Operations Map
+- **Add new AWS resource type**: Extend `/internal/aws/` with new service
+- **UI component changes**: Modify `/internal/ui/components/`
+- **New navigation features**: Update main app model
+- **Styling changes**: Modify `/internal/ui/styles/styles.go`
+- **Key bindings**: Update component `Update()` methods
+
+## Future Development Roadmap
+
+### High Priority Features
+- **Resource Expansion**: EC2, S3, Lambda, RDS support
+- **Refresh Functionality**: Real-time data updates (`r` key)
+- **Configuration System**: User preferences and settings
+- **Export Capabilities**: Save role configurations
+
+### UI/UX Enhancements
+- **Command Mode**: `:` prefix commands (vim-style)
+- **Help System**: Built-in help and shortcuts
+- **Theme Support**: Multiple color schemes
+- **Search Enhancement**: Advanced filtering options
+
+### Technical Improvements
+- **Caching Layer**: Reduce AWS API calls
+- **Performance Optimization**: Large dataset handling
+- **Error Recovery**: Robust error handling and retry logic
+- **Testing Coverage**: Comprehensive test suite
+
+## Development Rules & Constraints
+
+### Mandatory Practices
+- **Context Documentation**: Always update `.claude/docs/context_session_N.md` for significant changes
+- **Code Formatting**: Run `go fmt ./...` before any commits
+- **Error Handling**: Never ignore AWS API errors
+- **UI Responsiveness**: Maintain async patterns for all blocking operations
+- **Pattern Consistency**: Follow established Bubble Tea and Go patterns
+
+### Quality Gates
+- **Build Success**: All code must compile cleanly
+- **Test Passing**: Existing tests must continue to pass
+- **Lint Clean**: Code must pass golangci-lint checks
+- **Functional Verification**: Test critical paths manually
+
+### Architectural Constraints
+- **No Blocking UI**: All AWS API calls must be async
+- **Service Separation**: Maintain clear separation between AWS/UI/Model layers
+- **Component Isolation**: UI components should be self-contained
+- **Error Boundaries**: Each component handles its own error states
+
+---
+
+**Meta-Context for Claude Code**: This CLAUDE.md is designed to provide hierarchical context that aligns with Claude Code's memory retrieval patterns. Each section builds upon the previous one, providing both high-level understanding and specific implementation details. The structure supports both quick reference and deep understanding based on the complexity of the requested task.
