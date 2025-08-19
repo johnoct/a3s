@@ -110,6 +110,19 @@ var (
 	SearchInput = BaseStyle.
 			Foreground(lipgloss.Color("#FFFFFF"))
 
+	SearchMatch = BaseStyle.
+			Background(lipgloss.Color("#FFE082")).
+			Foreground(lipgloss.Color("#000000"))
+
+	SearchCurrentMatch = BaseStyle.
+				Background(lipgloss.Color("#FF5722")).
+				Foreground(lipgloss.Color("#FFFFFF")).
+				Bold(true)
+
+	SearchInfo = BaseStyle.
+			Foreground(accentColor).
+			Bold(true)
+
 	// Tab styles
 	ActiveTab = BaseStyle.
 			Bold(true).

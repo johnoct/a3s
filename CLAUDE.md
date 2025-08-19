@@ -269,6 +269,7 @@ When asked to modify functionality:
 - **Leverage Agents**: Review agents you have access to and use it as needed. For example, when working on the tui, consult and work with charm-tui-developer agent.
 - **Review your code**: Before committing, consult with code-reviewer agent to review your code.
 - **Code Formatting**: Run `go fmt ./...` before any commits
+- **Committing Changes**: When asked to save and push up or making any commits, always use the git-manager agent.
 - **Error Handling**: Never ignore AWS API errors
 - **UI Responsiveness**: Maintain async patterns for all blocking operations
 - **Pattern Consistency**: Follow established Bubble Tea and Go patterns
