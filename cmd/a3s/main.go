@@ -49,7 +49,7 @@ func main() {
 
 	p := tea.NewProgram(app,
 		tea.WithAltScreen(),
-		tea.WithMouseCellMotion(), // Enable mouse/resize events
+		// Removed tea.WithMouseCellMotion() to allow terminal text selection
 	)
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)

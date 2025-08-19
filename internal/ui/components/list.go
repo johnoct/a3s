@@ -227,12 +227,9 @@ func (m ListModel) View() string {
 	var content strings.Builder
 	var fullView strings.Builder
 
-	// Add top margin for better spacing
-	fullView.WriteString("\n")
-
-	// Create header with ASCII art and AWS info
+	// Create header with ASCII art and AWS info (no top margin needed)
 	fullView.WriteString(m.renderHeader())
-	fullView.WriteString("\n")
+	fullView.WriteString("\n\n") // Extra line for spacing, will be occupied by title/tabs in detail view
 
 	// Search bar (if in search mode) - outside the border
 	if m.searchMode {
@@ -242,7 +239,8 @@ func (m ListModel) View() string {
 	}
 
 	// Calculate column widths based on terminal width
-	availableWidth := m.width - 6 // Account for border and padding
+	// Account for smaller container (m.width-2) and border padding
+	availableWidth := m.width - 8 // Account for border, padding, and left margin
 	if availableWidth < 80 {
 		availableWidth = 80
 	}
@@ -269,16 +267,16 @@ func (m ListModel) View() string {
 	content.WriteString("\n")
 
 	// Calculate visible height accounting for border and header
-	borderHeight := 4 // Border takes up space
-	headerHeight := 8 // ASCII art (6 lines) + top margin (1) + spacing (1)
+	borderHeight := 2 // Reduced from 4
+	headerHeight := 9 // ASCII art (6 lines) + top margin (1) + spacing (2)
 	searchHeight := 0
 	if m.searchMode {
 		searchHeight = 2
 	}
-	statusHeight := 2
+	statusHeight := 1 // Reduced from 2
 	helpHeight := 1
 
-	visibleHeight := m.height - borderHeight - headerHeight - searchHeight - statusHeight - helpHeight - 1
+	visibleHeight := m.height - borderHeight - headerHeight - searchHeight - statusHeight - helpHeight
 	if visibleHeight < 5 {
 		visibleHeight = 5
 	}
@@ -339,7 +337,8 @@ func (m ListModel) View() string {
 	containerHeight := visibleHeight + 2 // Content + header line
 
 	// Apply the border container to the content with dynamic sizing
-	borderedContent := styles.GetMainContainer(m.width, containerHeight).Render(strings.TrimRight(content.String(), "\n"))
+	borderedContent := styles.GetMainContainer(m.width-2, containerHeight).Render(strings.TrimRight(content.String(), "\n"))
+	fullView.WriteString("  ") // 2 spaces for left padding
 	fullView.WriteString(borderedContent)
 	fullView.WriteString("\n")
 

@@ -390,11 +390,12 @@ func (m *DetailModel) scrollToMatch() {
 func (m *DetailModel) calculateVisibleHeight() int {
 	const (
 		minHeight     = 5
-		borderPadding = 4
-		baseUIHeight  = 9 // title(2) + tab(2) + status(2) + help(1) + padding(2)
+		borderPadding = 2 // Reduced from 4
+		headerHeight  = 8 // ASCII art (6 lines) + spacing (2) - accounting for top margin
+		baseUIHeight  = 6 // title(2) + tab(2) + status(1) + help(1) - reduced padding
 	)
 
-	calculatedHeight := m.height - baseUIHeight - borderPadding
+	calculatedHeight := m.height - headerHeight - baseUIHeight - borderPadding
 	if calculatedHeight < minHeight {
 		return minHeight
 	}
@@ -428,10 +429,24 @@ func (m *DetailModel) renderPolicyDocumentView() string {
 	var content strings.Builder
 	var fullView strings.Builder
 
-	// Title for policy document view
+	// Header with logo and AWS identity (like list view) - no top margin needed
+	fullView.WriteString(m.renderHeader())
+	fullView.WriteString("\n")
+
+	// Title for policy document view - with left padding
 	title := fmt.Sprintf("📄 Policy Document: %s", m.policyName)
+	// Ensure title doesn't exceed terminal width
+	titleWidth := lipgloss.Width(title)
+	if titleWidth > m.width-4 {
+		// Truncate if too long
+		maxLen := m.width - 10 // Leave space for emoji and ellipsis
+		if len(m.policyName) > maxLen {
+			title = fmt.Sprintf("📄 Policy Document: %s...", m.policyName[:maxLen])
+		}
+	}
+	fullView.WriteString("   ") // 3 spaces to align with header
 	fullView.WriteString(styles.TitleStyle.Render(title))
-	fullView.WriteString("\n\n")
+	fullView.WriteString("\n\n") // Extra line to match the spacing of tabs in normal view
 
 	// Policy document content with scrolling and search highlighting
 	lines := strings.Split(m.policyDocument, "\n")
@@ -448,9 +463,9 @@ func (m *DetailModel) renderPolicyDocumentView() string {
 	}
 
 	// Calculate available width for the policy document content
-	// GetMainContainer sets width to (m.width - 2), and CodeBlock adds padding(1) on each side
-	// So the available content width is: (m.width - 2) - 2 = m.width - 4
-	availableWidth := m.width - 4
+	// GetMainContainer sets width to ((m.width-2) - 2), and CodeBlock adds padding(1) on each side
+	// So the available content width is: (m.width - 4) - 2 = m.width - 6
+	availableWidth := m.width - 6
 	if availableWidth < 80 {
 		availableWidth = 80
 	}
@@ -478,7 +493,8 @@ func (m *DetailModel) renderPolicyDocumentView() string {
 	// Apply code block styling and border
 	styledContent := styles.CodeBlock.Render(strings.TrimRight(content.String(), "\n"))
 	// Height calculation: visibleHeight + CodeBlock padding(top:1, bottom:1) = visibleHeight + 2
-	borderedContent := styles.GetMainContainer(m.width, visibleHeight+2).Render(styledContent)
+	borderedContent := styles.GetMainContainer(m.width-2, visibleHeight+2).Render(styledContent)
+	fullView.WriteString("  ") // 2 spaces to align border properly
 	fullView.WriteString(borderedContent)
 	fullView.WriteString("\n")
 
@@ -610,12 +626,17 @@ func (m *DetailModel) renderNormalView() string {
 	var content strings.Builder
 	var fullView strings.Builder
 
-	// Title (outside the border)
+	// Header with logo and AWS identity (like list view) - no top margin needed
+	fullView.WriteString(m.renderHeader())
+	fullView.WriteString("\n")
+
+	// Title (outside the border) - with left padding to align with header
 	title := fmt.Sprintf("🔍 Role: %s", m.role.Name)
+	fullView.WriteString("   ") // 3 spaces to align with header
 	fullView.WriteString(styles.TitleStyle.Render(title))
 	fullView.WriteString("\n")
 
-	// Tabs (outside the border, just above it)
+	// Tabs (outside the border, just above it) - with left padding
 	var tabs []string
 	for i, tab := range m.tabs {
 		if i == m.activeTab {
@@ -624,6 +645,7 @@ func (m *DetailModel) renderNormalView() string {
 			tabs = append(tabs, styles.InactiveTab.Render(tab))
 		}
 	}
+	fullView.WriteString("   ") // 3 spaces to align with border content (2 for border position + 1 for border padding)
 	fullView.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, tabs...))
 	fullView.WriteString("\n")
 
@@ -657,7 +679,10 @@ func (m *DetailModel) renderNormalView() string {
 	}
 
 	// Calculate available width
-	availableWidth := m.width - 6 // Account for border and padding
+	// GetMainContainer sets width to ((m.width-2) - 2) = m.width - 4
+	// MainContainer adds padding(0, 1) so content width is (m.width - 4) - 2 = m.width - 6
+	// Plus 2 for left margin = m.width - 8
+	availableWidth := m.width - 8 // Account for border, padding, and left margin
 	if availableWidth < 80 {
 		availableWidth = 80
 	}
@@ -669,7 +694,8 @@ func (m *DetailModel) renderNormalView() string {
 	}
 
 	// Apply the border container to the content with dynamic sizing
-	borderedContent := styles.GetMainContainer(m.width, visibleHeight).Render(strings.TrimRight(content.String(), "\n"))
+	borderedContent := styles.GetMainContainer(m.width-2, visibleHeight).Render(strings.TrimRight(content.String(), "\n"))
+	fullView.WriteString("  ") // 2 spaces to align border properly
 	fullView.WriteString(borderedContent)
 	fullView.WriteString("\n")
 
@@ -746,7 +772,7 @@ func (m *DetailModel) renderTrustPolicy() string {
 	s.WriteString("\n\n")
 
 	// Calculate available width for content (same as normal view)
-	availableWidth := m.width - 6 // Account for border and padding
+	availableWidth := m.width - 8 // Match the normal view width calculation
 	if availableWidth < 80 {
 		availableWidth = 80
 	}
@@ -849,4 +875,80 @@ func (m *DetailModel) renderTags() string {
 	}
 
 	return s.String()
+}
+
+func (m *DetailModel) renderHeader() string {
+	var header strings.Builder
+
+	// Simple and readable a3s logo (same as list view)
+	asciiArt := []string{
+		"        ____      ",
+		"       |___ \\     ",
+		"   __ _  __) |___ ",
+		"  / _` ||__ </ __|",
+		" | (_| |___) \\__ \\",
+		"  \\__,_|____/|___/",
+	}
+
+	// Format AWS identity information (left side, like k9s)
+	// Add padding to align with the main content border (2 spaces for border + 1 space for content padding)
+	leftPadding := "   " // 3 spaces to align with bordered content
+	var infoLines []string
+	if m.identity != nil {
+		infoLines = []string{
+			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Account:"), styles.HeaderValue.Render(m.identity.Account)),
+			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("User:"), styles.HeaderValue.Render(m.identity.DisplayName)),
+			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Region:"), styles.HeaderValue.Render(m.region)),
+		}
+		// Add profile if different from user
+		if m.profile != "" && m.profile != "default" {
+			infoLines = append(infoLines, fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Profile:"), styles.HeaderValue.Render(m.profile)))
+		}
+	} else {
+		infoLines = []string{
+			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Profile:"), styles.HeaderValue.Render(m.profile)),
+			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Region:"), styles.HeaderValue.Render(m.region)),
+		}
+	}
+
+	// Calculate dimensions for proper k9s-style layout
+	asciiWidth := 18  // Actual width of the ASCII art
+	rightPadding := 4 // Padding from right edge (like k9s)
+	minSpacing := 12  // Increased minimum spacing for better separation
+
+	// Find the maximum width of left content for consistent spacing
+	maxLeftWidth := 0
+	for _, line := range infoLines {
+		if w := lipgloss.Width(line); w > maxLeftWidth {
+			maxLeftWidth = w
+		}
+	}
+
+	// Calculate available space (account for terminal width and right padding)
+	availableWidth := m.width - rightPadding
+
+	// Calculate spacing between info and ASCII art
+	spacing := availableWidth - maxLeftWidth - asciiWidth
+	if spacing < minSpacing {
+		spacing = minSpacing
+	}
+
+	// Build the header with AWS info on the left and ASCII art on the right
+	for i := 0; i < 6; i++ {
+		if i < len(infoLines) {
+			// Calculate padding for this specific line
+			lineWidth := lipgloss.Width(infoLines[i])
+			currentSpacing := availableWidth - lineWidth - asciiWidth
+			if currentSpacing < minSpacing {
+				currentSpacing = minSpacing
+			}
+			header.WriteString(infoLines[i] + strings.Repeat(" ", currentSpacing) + styles.ASCIIArtStyle.Render(asciiArt[i]))
+		} else {
+			// No info line, just the ASCII art aligned to the right
+			header.WriteString(strings.Repeat(" ", maxLeftWidth+spacing) + styles.ASCIIArtStyle.Render(asciiArt[i]))
+		}
+		header.WriteString("\n")
+	}
+
+	return header.String()
 }
