@@ -57,8 +57,7 @@ func main() {
 }
 
 func printHelp() {
-	fmt.Println(`
-a3s - AWS Terminal User Interface
+	fmt.Println(`a3s - AWS Terminal User Interface
 
 Usage:
   a3s [flags]
@@ -87,6 +86,5 @@ Examples:
   a3s                           # Use default profile and region
   a3s -profile prod             # Use 'prod' profile
   a3s -region us-west-2         # Use specific region
-  a3s -profile dev -region eu-west-1
-`)
+  a3s -profile dev -region eu-west-1`)
 }

@@ -222,7 +222,7 @@ func (m ListModel) View() string {
 
 	// Add top margin for better spacing
 	fullView.WriteString("\n")
-	
+
 	// Create header with ASCII art and AWS info
 	fullView.WriteString(m.renderHeader())
 	fullView.WriteString("\n")
@@ -381,10 +381,10 @@ func (m ListModel) renderHeader() string {
 	}
 
 	// Calculate dimensions for proper k9s-style layout
-	asciiWidth := 18     // Actual width of the ASCII art
-	rightPadding := 4    // Padding from right edge (like k9s)
-	minSpacing := 12     // Increased minimum spacing for better separation
-	
+	asciiWidth := 18  // Actual width of the ASCII art
+	rightPadding := 4 // Padding from right edge (like k9s)
+	minSpacing := 12  // Increased minimum spacing for better separation
+
 	// Find the maximum width of left content for consistent spacing
 	maxLeftWidth := 0
 	for _, line := range infoLines {
@@ -396,7 +396,7 @@ func (m ListModel) renderHeader() string {
 	// Calculate available space (account for terminal width and right padding)
 	availableWidth := m.width - rightPadding
 	totalRequiredWidth := maxLeftWidth + minSpacing + asciiWidth
-	
+
 	// Calculate spacing - prioritize right-alignment like k9s
 	var spacing int
 	if totalRequiredWidth <= availableWidth {
