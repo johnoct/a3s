@@ -98,7 +98,14 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.detailView = detailModel.(*DetailModel)
 			return m, cmd
 		case tea.KeyMsg:
-			if msg.String() == "esc" || msg.String() == "q" {
+			// Only handle esc/q to close detail view if we're not viewing a policy document
+			if msg.String() == "esc" && !m.detailView.IsViewingPolicyDocument() {
+				m.showDetail = false
+				m.detailView = nil
+				m.loadingDetail = false
+				return m, nil
+			}
+			if msg.String() == "q" {
 				m.showDetail = false
 				m.detailView = nil
 				m.loadingDetail = false
@@ -117,7 +124,7 @@ func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loadingDetail = false
 		if msg.role != nil {
 			m.selectedRole = msg.role
-			m.detailView = NewDetailModel(m.selectedRole, m.profile, m.region)
+			m.detailView = NewDetailModel(m.selectedRole, m.profile, m.region, m.roleService)
 			// Set the window size and identity for detail view
 			m.detailView.Update(tea.WindowSizeMsg{Width: m.width, Height: m.height})
 			if m.identity != nil {

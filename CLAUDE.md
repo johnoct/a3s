@@ -16,6 +16,8 @@
 - Async role detail loading with loading indicators
 - Vim-like keyboard navigation (j/k, g/G, Tab, ESC, q)
 - Complete IAM policy display (managed + inline policies)
+- **Interactive policy document viewer** with full JSON display and navigation
+- Policy selection and viewing with async loading (Enter to view, ESC to return)
 
 ## Technology Stack & Dependencies
 
@@ -47,7 +49,7 @@ github.com/aws/aws-sdk-go-v2/service/sts v1.37.0
 ```
 a3s/                          # Root project directory
 ├── .claude/
-│   ├── docs/                 # Context session documentation (5 sessions)
+│   ├── docs/                 # Context session documentation (6 sessions)
 │   └── settings.local.json   # Local Claude Code settings
 ├── cmd/a3s/                  # Application entry points
 │   ├── main.go              # Current main application
@@ -131,9 +133,10 @@ func (rs *RoleService) GetRoleDetails(roleName string) (*RoleDetails, error)
 **Important**: Always use `GetRoleDetails()` for complete role information (includes policies, tags)
 
 ### 3. Async Loading Pattern (Recently Implemented)
-- **Trigger**: User selects role (Enter key)
+- **Trigger**: User selects role (Enter key) or policy document (Enter in Policies tab)
 - **Flow**: Loading indicator → AWS API call → Update UI with detailed data
-- **Implementation**: `roleDetailsLoadedMsg` message type in Bubble Tea pattern
+- **Implementation**: `roleDetailsLoadedMsg` and `policyDocumentLoadedMsg` message types in Bubble Tea pattern
+- **Policy Document Loading**: Async fetching of IAM policy JSON documents with loading indicators
 
 ### 4. UI State Management
 - **Navigation State**: Tracked in main app model
@@ -142,7 +145,20 @@ func (rs *RoleService) GetRoleDetails(roleName string) (*RoleDetails, error)
 
 ## Recent Development History & Context
 
-### Session 5 (Latest): IAM Policy Display Fix
+### Session 6 (Latest): IAM Policy Document Viewer Implementation
+**Problem Solved**: Users needed to view actual policy JSON documents without leaving the TUI
+**Root Cause**: Policy list showed names but not document content
+**Solution**: Implemented comprehensive policy document viewing with interactive navigation
+
+**Key Changes**:
+- Added `PolicyInfo` struct with ARN support for managed policies
+- Implemented `GetManagedPolicyDocument()` service method
+- Created interactive policy navigation (j/k selection, Enter to view)
+- Added policy document viewer with scroll support (j/k, g/G navigation)
+- Fixed navigation flow (ESC from policy document returns to policies tab)
+- Async policy document loading with loading indicators
+
+### Session 5: IAM Policy Display Fix
 **Problem Solved**: Roles showing "No policies attached" when policies existed
 **Root Cause**: Using `ListRoles()` basic data instead of `GetRoleDetails()`
 **Solution**: Implemented async role detail loading with proper AWS API integration
@@ -153,9 +169,11 @@ func (rs *RoleService) GetRoleDetails(roleName string) (*RoleDetails, error)
 - Proper integration of detailed role data including policies
 
 ### Critical Implementation Notes
-- **AWS API Strategy**: Two-tier loading (list → details on demand)
-- **Performance**: Async loading prevents UI blocking
-- **Error Handling**: Comprehensive error handling for AWS API failures
+- **AWS API Strategy**: Multi-tier loading (list → details → policy documents on demand)
+- **Performance**: Async loading prevents UI blocking for all AWS API calls
+- **Policy Document Viewing**: Interactive navigation with full JSON display and async loading
+- **Navigation Flow**: Hierarchical navigation (Roles → Role Detail → Policy Document → back to Policy List)
+- **Error Handling**: Comprehensive error handling for AWS API failures including policy document fetching
 
 ## Testing Strategy & Quality Assurance
 
@@ -163,7 +181,7 @@ func (rs *RoleService) GetRoleDetails(roleName string) (*RoleDetails, error)
 ```bash
 internal/
 ├── aws/        # Unit tests for AWS service layer
-├── ui/         # Component tests for UI elements  
+├── ui/         # Component tests for UI elements
 └── model/      # Integration tests for app state
 ```
 
@@ -184,7 +202,7 @@ internal/
 ### Documentation Pattern
 - **Location**: `/.claude/docs/context_session_N.md`
 - **Purpose**: Track development progress and decisions
-- **Current Count**: 5 sessions (context_session_1.md through context_session_5.md)
+- **Current Count**: 6 sessions (context_session_1.md through context_session_6.md)
 
 **Before making significant changes**, always:
 1. Read the latest context session for recent developments
@@ -220,6 +238,8 @@ When asked to modify functionality:
 - **New navigation features**: Update main app model
 - **Styling changes**: Modify `/internal/ui/styles/styles.go`
 - **Key bindings**: Update component `Update()` methods
+- **Policy document viewing**: Navigate with j/k in Policies tab, Enter to view, ESC to return
+- **Document scrolling**: j/k for line-by-line, g/G for top/bottom navigation
 
 ## Future Development Roadmap
 
@@ -245,6 +265,9 @@ When asked to modify functionality:
 
 ### Mandatory Practices
 - **Context Documentation**: Always update `.claude/docs/context_session_N.md` for significant changes
+- **Self Context Documentation**: Always use claude-context-engineer agent to update CLAUDE.md before you commit and push up
+- **Leverage Agents**: Review agents you have access to and use it as needed. For example, when working on the tui, consult and work with charm-tui-developer agent.
+- **Review your code**: Before committing, consult with code-reviewer agent to review your code.
 - **Code Formatting**: Run `go fmt ./...` before any commits
 - **Error Handling**: Never ignore AWS API errors
 - **UI Responsiveness**: Maintain async patterns for all blocking operations

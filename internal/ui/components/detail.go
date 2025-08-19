@@ -1,6 +1,7 @@
 package components
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -12,24 +13,48 @@ import (
 )
 
 type DetailModel struct {
-	role      *iam.Role
-	profile   string
-	region    string
-	identity  *identity.Identity
-	width     int
-	height    int
-	scrollY   int
-	activeTab int
-	tabs      []string
+	role           *iam.Role
+	profile        string
+	region         string
+	identity       *identity.Identity
+	roleService    *iam.RoleService
+	width          int
+	height         int
+	scrollY        int
+	activeTab      int
+	tabs           []string
+	viewState      viewState
+	selectedPolicy int
+	policyDocument string
+	loadingPolicy  bool
 }
 
-func NewDetailModel(role *iam.Role, profile, region string) *DetailModel {
+type viewState int
+
+const (
+	viewNormal viewState = iota
+	viewPolicyDocument
+)
+
+func (m *DetailModel) IsViewingPolicyDocument() bool {
+	return m.viewState == viewPolicyDocument
+}
+
+func NewDetailModel(role *iam.Role, profile, region string, roleService *iam.RoleService) *DetailModel {
 	return &DetailModel{
-		role:    role,
-		profile: profile,
-		region:  region,
-		tabs:    []string{"Overview", "Trust Policy", "Policies", "Tags"},
+		role:        role,
+		profile:     profile,
+		region:      region,
+		roleService: roleService,
+		tabs:        []string{"Overview", "Trust Policy", "Policies", "Tags"},
+		viewState:   viewNormal,
 	}
+}
+
+// Message types for async policy loading
+type policyDocumentLoadedMsg struct {
+	document string
+	err      error
 }
 
 func (m *DetailModel) Init() tea.Cmd {
@@ -47,29 +72,217 @@ func (m *DetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		return m, nil
 
+	case policyDocumentLoadedMsg:
+		m.loadingPolicy = false
+		if msg.err != nil {
+			m.policyDocument = fmt.Sprintf("Error loading policy: %v", msg.err)
+		} else {
+			m.policyDocument = msg.document
+		}
+		m.viewState = viewPolicyDocument
+		m.scrollY = 0
+		return m, nil
+
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "tab", "l":
-			m.activeTab = (m.activeTab + 1) % len(m.tabs)
-			m.scrollY = 0
-		case "shift+tab", "h":
-			m.activeTab = (m.activeTab - 1 + len(m.tabs)) % len(m.tabs)
-			m.scrollY = 0
-		case "j", "down":
-			m.scrollY++
-		case "k", "up":
-			if m.scrollY > 0 {
-				m.scrollY--
-			}
-		case "g":
-			m.scrollY = 0
+		switch m.viewState {
+		case viewPolicyDocument:
+			return m.updatePolicyDocumentView(msg)
+		case viewNormal:
+			return m.updateNormalView(msg)
 		}
 	}
 
 	return m, nil
 }
 
+func (m *DetailModel) updatePolicyDocumentView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.viewState = viewNormal
+		m.scrollY = 0
+		return m, nil
+	case "j", "down":
+		m.scrollY++
+	case "k", "up":
+		if m.scrollY > 0 {
+			m.scrollY--
+		}
+	case "g":
+		m.scrollY = 0
+	case "G":
+		// Scroll to bottom
+		lines := strings.Split(m.policyDocument, "\n")
+		visibleHeight := m.calculateVisibleHeight()
+		m.scrollY = max(0, len(lines)-visibleHeight)
+	}
+	return m, nil
+}
+
+func (m *DetailModel) updateNormalView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "tab", "l":
+		m.activeTab = (m.activeTab + 1) % len(m.tabs)
+		m.scrollY = 0
+		m.selectedPolicy = 0
+	case "shift+tab", "h":
+		m.activeTab = (m.activeTab - 1 + len(m.tabs)) % len(m.tabs)
+		m.scrollY = 0
+		m.selectedPolicy = 0
+	case "j", "down":
+		if m.activeTab == 2 { // Policies tab
+			totalPolicies := len(m.role.ManagedPolicies) + len(m.role.InlinePolicies)
+			if totalPolicies > 0 {
+				m.selectedPolicy = min(m.selectedPolicy+1, totalPolicies-1)
+			}
+		} else {
+			m.scrollY++
+		}
+	case "k", "up":
+		if m.activeTab == 2 { // Policies tab
+			m.selectedPolicy = max(0, m.selectedPolicy-1)
+		} else if m.scrollY > 0 {
+			m.scrollY--
+		}
+	case "g":
+		m.scrollY = 0
+		m.selectedPolicy = 0
+	case "G":
+		if m.activeTab == 2 { // Policies tab
+			totalPolicies := len(m.role.ManagedPolicies) + len(m.role.InlinePolicies)
+			if totalPolicies > 0 {
+				m.selectedPolicy = totalPolicies - 1
+			}
+		}
+	case "enter":
+		if m.activeTab == 2 { // Policies tab
+			return m, m.loadSelectedPolicy()
+		}
+	}
+	return m, nil
+}
+
+func (m *DetailModel) loadSelectedPolicy() tea.Cmd {
+	if m.loadingPolicy {
+		return nil
+	}
+
+	totalManagedPolicies := len(m.role.ManagedPolicies)
+
+	if m.selectedPolicy < totalManagedPolicies {
+		// It's a managed policy
+		policy := m.role.ManagedPolicies[m.selectedPolicy]
+		m.loadingPolicy = true
+		return func() tea.Msg {
+			doc, err := m.roleService.GetManagedPolicyDocument(context.Background(), policy.ARN)
+			return policyDocumentLoadedMsg{document: doc, err: err}
+		}
+	} else {
+		// It's an inline policy
+		inlineIndex := m.selectedPolicy - totalManagedPolicies
+		if inlineIndex < len(m.role.InlinePolicies) {
+			policyName := m.role.InlinePolicies[inlineIndex]
+			m.loadingPolicy = true
+			return func() tea.Msg {
+				doc, err := m.roleService.GetInlinePolicy(context.Background(), m.role.Name, policyName)
+				return policyDocumentLoadedMsg{document: doc, err: err}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (m *DetailModel) calculateVisibleHeight() int {
+	borderHeight := 4
+	titleHeight := 2
+	tabHeight := 2
+	statusHeight := 2
+	helpHeight := 1
+	return max(5, m.height-borderHeight-titleHeight-tabHeight-statusHeight-helpHeight-2)
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func (m *DetailModel) View() string {
+	switch m.viewState {
+	case viewPolicyDocument:
+		return m.renderPolicyDocumentView()
+	default:
+		return m.renderNormalView()
+	}
+}
+
+func (m *DetailModel) renderPolicyDocumentView() string {
+	var content strings.Builder
+	var fullView strings.Builder
+
+	// Title for policy document view
+	title := "📄 Policy Document"
+	fullView.WriteString(styles.TitleStyle.Render(title))
+	fullView.WriteString("\n\n")
+
+	// Policy document content with scrolling
+	lines := strings.Split(m.policyDocument, "\n")
+	visibleHeight := m.calculateVisibleHeight()
+
+	endIdx := m.scrollY + visibleHeight
+	if endIdx > len(lines) {
+		endIdx = len(lines)
+	}
+
+	for i := m.scrollY; i < endIdx; i++ {
+		if i < len(lines) {
+			content.WriteString(lines[i])
+			content.WriteString("\n")
+		}
+	}
+
+	// Calculate available width
+	availableWidth := m.width - 6
+	if availableWidth < 80 {
+		availableWidth = 80
+	}
+
+	// Fill empty space
+	for i := endIdx - m.scrollY; i < visibleHeight; i++ {
+		content.WriteString(strings.Repeat(" ", availableWidth))
+		content.WriteString("\n")
+	}
+
+	// Apply code block styling and border
+	styledContent := styles.CodeBlock.Render(strings.TrimRight(content.String(), "\n"))
+	borderedContent := styles.GetMainContainer(m.width, visibleHeight+4).Render(styledContent)
+	fullView.WriteString(borderedContent)
+	fullView.WriteString("\n")
+
+	// Status bar
+	fullView.WriteString(styles.RenderStatusBar(m.profile, m.region, 1, m.width))
+	fullView.WriteString("\n")
+
+	// Help for policy document view
+	help := []string{
+		styles.HelpKey.Render("j/k") + " " + styles.HelpDesc.Render("scroll"),
+		styles.HelpKey.Render("g/G") + " " + styles.HelpDesc.Render("top/bottom"),
+		styles.HelpKey.Render("Esc") + " " + styles.HelpDesc.Render("back to policies"),
+	}
+	fullView.WriteString(styles.HelpStyle.Render(strings.Join(help, " | ")))
+
+	return fullView.String()
+}
+
+func (m *DetailModel) renderNormalView() string {
 	var content strings.Builder
 	var fullView strings.Builder
 
@@ -105,18 +318,7 @@ func (m *DetailModel) View() string {
 
 	// Apply scrolling
 	lines := strings.Split(tabContent, "\n")
-
-	// Calculate visible height accounting for border
-	borderHeight := 4
-	titleHeight := 2
-	tabHeight := 2
-	statusHeight := 2
-	helpHeight := 1
-
-	visibleHeight := m.height - borderHeight - titleHeight - tabHeight - statusHeight - helpHeight - 2
-	if visibleHeight < 5 {
-		visibleHeight = 5
-	}
+	visibleHeight := m.calculateVisibleHeight()
 
 	endIdx := m.scrollY + visibleHeight
 	if endIdx > len(lines) {
@@ -142,11 +344,8 @@ func (m *DetailModel) View() string {
 		content.WriteString("\n")
 	}
 
-	// Calculate container height
-	containerHeight := visibleHeight
-
 	// Apply the border container to the content with dynamic sizing
-	borderedContent := styles.GetMainContainer(m.width, containerHeight).Render(strings.TrimRight(content.String(), "\n"))
+	borderedContent := styles.GetMainContainer(m.width, visibleHeight).Render(strings.TrimRight(content.String(), "\n"))
 	fullView.WriteString(borderedContent)
 	fullView.WriteString("\n")
 
@@ -155,15 +354,30 @@ func (m *DetailModel) View() string {
 	fullView.WriteString("\n")
 
 	// Help (outside the border)
-	help := []string{
+	help := m.getHelpText()
+	fullView.WriteString(styles.HelpStyle.Render(strings.Join(help, " | ")))
+
+	return fullView.String()
+}
+
+func (m *DetailModel) getHelpText() []string {
+	if m.activeTab == 2 { // Policies tab
+		if len(m.role.ManagedPolicies) > 0 || len(m.role.InlinePolicies) > 0 {
+			return []string{
+				styles.HelpKey.Render("Tab/l") + " " + styles.HelpDesc.Render("next tab"),
+				styles.HelpKey.Render("j/k") + " " + styles.HelpDesc.Render("navigate"),
+				styles.HelpKey.Render("Enter") + " " + styles.HelpDesc.Render("view policy"),
+				styles.HelpKey.Render("Esc") + " " + styles.HelpDesc.Render("back"),
+			}
+		}
+	}
+
+	return []string{
 		styles.HelpKey.Render("Tab/l") + " " + styles.HelpDesc.Render("next tab"),
 		styles.HelpKey.Render("Shift+Tab/h") + " " + styles.HelpDesc.Render("prev tab"),
 		styles.HelpKey.Render("j/k") + " " + styles.HelpDesc.Render("scroll"),
 		styles.HelpKey.Render("Esc") + " " + styles.HelpDesc.Render("back"),
 	}
-	fullView.WriteString(styles.HelpStyle.Render(strings.Join(help, " | ")))
-
-	return fullView.String()
 }
 
 func (m *DetailModel) renderOverview() string {
@@ -217,12 +431,29 @@ func (m *DetailModel) renderPolicies() string {
 	s.WriteString(styles.DetailTitle.Render("Attached Policies"))
 	s.WriteString("\n\n")
 
+	if m.loadingPolicy {
+		s.WriteString(styles.LoadingStyle.Render("Loading policy document..."))
+		s.WriteString("\n")
+		return s.String()
+	}
+
+	currentIndex := 0
+
 	if len(m.role.ManagedPolicies) > 0 {
 		s.WriteString(styles.DetailLabel.Render("Managed Policies:"))
 		s.WriteString("\n")
 		for _, policy := range m.role.ManagedPolicies {
-			s.WriteString("  • " + policy)
+			prefix := "  • "
+			policyText := policy.Name
+
+			if currentIndex == m.selectedPolicy {
+				// Highlight selected policy
+				s.WriteString(styles.SelectedItem.Render(prefix + policyText))
+			} else {
+				s.WriteString(styles.ListItem.Render(prefix + policyText))
+			}
 			s.WriteString("\n")
+			currentIndex++
 		}
 		s.WriteString("\n")
 	}
@@ -231,13 +462,25 @@ func (m *DetailModel) renderPolicies() string {
 		s.WriteString(styles.DetailLabel.Render("Inline Policies:"))
 		s.WriteString("\n")
 		for _, policy := range m.role.InlinePolicies {
-			s.WriteString("  • " + policy)
+			prefix := "  • "
+			policyText := policy
+
+			if currentIndex == m.selectedPolicy {
+				// Highlight selected policy
+				s.WriteString(styles.SelectedItem.Render(prefix + policyText))
+			} else {
+				s.WriteString(styles.ListItem.Render(prefix + policyText))
+			}
 			s.WriteString("\n")
+			currentIndex++
 		}
 	}
 
 	if len(m.role.ManagedPolicies) == 0 && len(m.role.InlinePolicies) == 0 {
 		s.WriteString(styles.HelpDesc.Render("No policies attached"))
+	} else {
+		s.WriteString("\n")
+		s.WriteString(styles.HelpDesc.Render("Press Enter to view the selected policy document"))
 	}
 
 	return s.String()

@@ -33,8 +33,13 @@ type Role struct {
 	Tags               []Tag
 	TrustPolicy        string
 	LastUsed           *time.Time
-	ManagedPolicies    []string
+	ManagedPolicies    []PolicyInfo
 	InlinePolicies     []string
+}
+
+type PolicyInfo struct {
+	Name string
+	ARN  string
 }
 
 type Tag struct {
@@ -132,7 +137,10 @@ func (s *RoleService) GetRoleDetails(ctx context.Context, roleName string) (*Rol
 	})
 	if err == nil {
 		for _, p := range managedPolicies.AttachedPolicies {
-			role.ManagedPolicies = append(role.ManagedPolicies, *p.PolicyName)
+			role.ManagedPolicies = append(role.ManagedPolicies, PolicyInfo{
+				Name: *p.PolicyName,
+				ARN:  *p.PolicyArn,
+			})
 		}
 	}
 
@@ -157,6 +165,28 @@ func (s *RoleService) GetInlinePolicy(ctx context.Context, roleName, policyName 
 	}
 
 	decoded, _ := url.QueryUnescape(*output.PolicyDocument)
+	return formatJSON(decoded), nil
+}
+
+func (s *RoleService) GetManagedPolicyDocument(ctx context.Context, policyArn string) (string, error) {
+	// First get the policy to find the default version
+	policy, err := s.client.GetPolicy(ctx, &iam.GetPolicyInput{
+		PolicyArn: &policyArn,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to get policy: %w", err)
+	}
+
+	// Get the policy document for the default version
+	policyVersion, err := s.client.GetPolicyVersion(ctx, &iam.GetPolicyVersionInput{
+		PolicyArn: &policyArn,
+		VersionId: policy.Policy.DefaultVersionId,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to get policy version: %w", err)
+	}
+
+	decoded, _ := url.QueryUnescape(*policyVersion.PolicyVersion.Document)
 	return formatJSON(decoded), nil
 }
 
