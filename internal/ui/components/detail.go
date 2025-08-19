@@ -447,8 +447,10 @@ func (m *DetailModel) renderPolicyDocumentView() string {
 		endIdx = len(lines)
 	}
 
-	// Calculate available width (accounting for border and CodeBlock padding)
-	availableWidth := m.width - 8 // border(2) + CodeBlock padding(2) + margins(4)
+	// Calculate available width for the policy document content
+	// GetMainContainer sets width to (m.width - 2), and CodeBlock adds padding(1) on each side
+	// So the available content width is: (m.width - 2) - 2 = m.width - 4
+	availableWidth := m.width - 4
 	if availableWidth < 80 {
 		availableWidth = 80
 	}
@@ -475,7 +477,8 @@ func (m *DetailModel) renderPolicyDocumentView() string {
 
 	// Apply code block styling and border
 	styledContent := styles.CodeBlock.Render(strings.TrimRight(content.String(), "\n"))
-	borderedContent := styles.GetMainContainer(m.width, visibleHeight+4).Render(styledContent)
+	// Height calculation: visibleHeight + CodeBlock padding(top:1, bottom:1) = visibleHeight + 2
+	borderedContent := styles.GetMainContainer(m.width, visibleHeight+2).Render(styledContent)
 	fullView.WriteString(borderedContent)
 	fullView.WriteString("\n")
 
@@ -740,8 +743,29 @@ func (m *DetailModel) renderTrustPolicy() string {
 	var s strings.Builder
 
 	s.WriteString(styles.DetailTitle.Render("Trust Relationships"))
-	s.WriteString("\n")
-	s.WriteString(styles.CodeBlock.Render(m.role.TrustPolicy))
+	s.WriteString("\n\n")
+
+	// Calculate available width for content (same as normal view)
+	availableWidth := m.width - 6 // Account for border and padding
+	if availableWidth < 80 {
+		availableWidth = 80
+	}
+
+	// Format the trust policy JSON with proper width
+	var formattedPolicy strings.Builder
+	lines := strings.Split(m.role.TrustPolicy, "\n")
+	for _, line := range lines {
+		// Pad each line to full width for consistent background
+		lineWidth := len(line)
+		if lineWidth < availableWidth {
+			line += strings.Repeat(" ", availableWidth-lineWidth)
+		}
+		formattedPolicy.WriteString(line)
+		formattedPolicy.WriteString("\n")
+	}
+
+	// Apply CodeBlock style to the entire formatted content
+	s.WriteString(styles.CodeBlock.Render(strings.TrimRight(formattedPolicy.String(), "\n")))
 
 	return s.String()
 }
