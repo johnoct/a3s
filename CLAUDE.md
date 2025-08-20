@@ -18,6 +18,7 @@
 - Complete IAM policy display (managed + inline policies)
 - **Interactive policy document viewer** with full JSON display and navigation
 - Policy selection and viewing with async loading (Enter to view, ESC to return)
+- **Consistent UI layout system** with standardized border alignment and terminal compatibility
 
 ## Technology Stack & Dependencies
 
@@ -49,7 +50,7 @@ github.com/aws/aws-sdk-go-v2/service/sts v1.37.0
 ```
 a3s/                          # Root project directory
 ├── .claude/
-│   ├── docs/                 # Context session documentation (6 sessions)
+│   ├── docs/                 # Context session documentation (7 sessions)
 │   └── settings.local.json   # Local Claude Code settings
 ├── cmd/a3s/                  # Application entry points
 │   ├── main.go              # Current main application
@@ -143,9 +144,34 @@ func (rs *RoleService) GetRoleDetails(roleName string) (*RoleDetails, error)
 - **Component State**: Each UI component manages its own state
 - **Loading States**: Explicit loading indicators for async operations
 
+### 5. UI Layout System (Session 7 Implementation)
+- **Border Alignment**: Standardized 2-space left padding for consistent border positioning
+- **Container Spacing**: Tab spacing adjusted to 3 spaces (2 for border + 1 for padding)
+- **Width Calculations**: Edge-to-edge content filling with proper container constraints
+- **Terminal Compatibility**: Mouse capture disabled for improved text selection in modern terminals
+- **Header Positioning**: Consistent header alignment across all views and components
+
 ## Recent Development History & Context
 
-### Session 6 (Latest): IAM Policy Document Viewer Implementation
+### Session 7 (Latest): UI Layout and Border Alignment Fixes
+**Problem Solved**: Border alignment inconsistencies between different views with misaligned headers, tabs, and borders
+**Root Cause**: Inconsistent spacing calculations and mouse capture interfering with terminal text selection
+**Solution**: Standardized UI layout system with consistent border positioning and improved terminal compatibility
+
+**Key Changes**:
+- **Border Alignment Consistency**: Standardized 2-space left padding across all components for proper border positioning
+- **Tab Positioning**: Adjusted tab spacing from 2 to 3 spaces (2 for border position + 1 for MainContainer padding)
+- **Header Positioning**: Removed inconsistent top margins and standardized header positioning across views
+- **Mouse Capture Removal**: Removed `tea.WithMouseCellMotion()` from main.go to enable text selection in Kitty terminal
+- **Width Calculations**: Fixed JSON content width calculations for edge-to-edge container filling
+- **Container Padding**: Standardized spacing calculations across list and detail components
+
+**Files Modified**:
+- `/cmd/a3s/main.go` - Removed mouse capture for better terminal compatibility
+- `/internal/ui/components/detail.go` - Multiple alignment and spacing fixes
+- `/internal/ui/components/list.go` - Consistent border padding implementation
+
+### Session 6: IAM Policy Document Viewer Implementation
 **Problem Solved**: Users needed to view actual policy JSON documents without leaving the TUI
 **Root Cause**: Policy list showed names but not document content
 **Solution**: Implemented comprehensive policy document viewing with interactive navigation
@@ -174,6 +200,8 @@ func (rs *RoleService) GetRoleDetails(roleName string) (*RoleDetails, error)
 - **Policy Document Viewing**: Interactive navigation with full JSON display and async loading
 - **Navigation Flow**: Hierarchical navigation (Roles → Role Detail → Policy Document → back to Policy List)
 - **Error Handling**: Comprehensive error handling for AWS API failures including policy document fetching
+- **UI Layout Consistency**: Standardized 2-space padding and 3-space tab positioning for consistent borders
+- **Terminal Compatibility**: Mouse capture disabled to maintain text selection capabilities
 
 ## Testing Strategy & Quality Assurance
 
@@ -202,7 +230,7 @@ internal/
 ### Documentation Pattern
 - **Location**: `/.claude/docs/context_session_N.md`
 - **Purpose**: Track development progress and decisions
-- **Current Count**: 6 sessions (context_session_1.md through context_session_6.md)
+- **Current Count**: 7 sessions (context_session_1.md through context_session_7.md)
 
 **Before making significant changes**, always:
 1. Read the latest context session for recent developments
@@ -240,6 +268,8 @@ When asked to modify functionality:
 - **Key bindings**: Update component `Update()` methods
 - **Policy document viewing**: Navigate with j/k in Policies tab, Enter to view, ESC to return
 - **Document scrolling**: j/k for line-by-line, g/G for top/bottom navigation
+- **UI layout fixes**: Maintain 2-space padding for borders, 3-space tab positioning
+- **Terminal compatibility**: Consider mouse capture impact on text selection
 
 ## Future Development Roadmap
 
