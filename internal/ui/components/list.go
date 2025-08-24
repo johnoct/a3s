@@ -27,7 +27,6 @@ type ListModel struct {
 	selectedRole  *iam.Role
 	showDetail    bool
 	detailView    *DetailModel
-	err           error
 	roleService   *iam.RoleService
 	loadingDetail bool
 }
@@ -228,15 +227,23 @@ func (m ListModel) View() string {
 	var fullView strings.Builder
 
 	// Create header with ASCII art and AWS info (no top margin needed)
-	fullView.WriteString(m.renderHeader())
+	fullView.WriteString(styles.RenderHeader(m.profile, m.region, m.identity, m.width))
 	fullView.WriteString("\n\n") // Extra line for spacing, will be occupied by title/tabs in detail view
 
-	// Search bar (if in search mode) - outside the border
+	// Search bar - always reserve space to prevent layout shifts
+	searchPrompt := styles.SearchPrompt.Render(" Search: ")
 	if m.searchMode {
-		fullView.WriteString(styles.SearchPrompt.Render("Search: "))
+		fullView.WriteString(searchPrompt)
 		fullView.WriteString(m.searchInput.View())
-		fullView.WriteString("\n")
+	} else {
+		// Render invisible search bar to maintain layout consistency
+		// Reserve space for both the prompt and a reasonable input width
+		promptWidth := lipgloss.Width(searchPrompt)
+		minInputWidth := 20 // Reserve space for input field
+		invisibleSpace := strings.Repeat(" ", promptWidth+minInputWidth)
+		fullView.WriteString(invisibleSpace)
 	}
+	fullView.WriteString("\n")
 
 	// Calculate column widths based on terminal width
 	// Account for smaller container (m.width-2) and border padding
@@ -269,10 +276,7 @@ func (m ListModel) View() string {
 	// Calculate visible height accounting for border and header
 	borderHeight := 2 // Reduced from 4
 	headerHeight := 9 // ASCII art (6 lines) + top margin (1) + spacing (2)
-	searchHeight := 0
-	if m.searchMode {
-		searchHeight = 2
-	}
+	searchHeight := 1 // Always reserve space for search bar to prevent layout shifts
 	statusHeight := 1 // Reduced from 2
 	helpHeight := 1
 
@@ -337,8 +341,7 @@ func (m ListModel) View() string {
 	containerHeight := visibleHeight + 2 // Content + header line
 
 	// Apply the border container to the content with dynamic sizing
-	borderedContent := styles.GetMainContainer(m.width-2, containerHeight).Render(strings.TrimRight(content.String(), "\n"))
-	fullView.WriteString("  ") // 2 spaces for left padding
+	borderedContent := styles.GetMainContainer(m.width, containerHeight).Render(strings.TrimRight(content.String(), "\n"))
 	fullView.WriteString(borderedContent)
 	fullView.WriteString("\n")
 
@@ -350,110 +353,6 @@ func (m ListModel) View() string {
 	fullView.WriteString(styles.RenderHelp())
 
 	return fullView.String()
-}
-
-func (m ListModel) renderHeader() string {
-	var header strings.Builder
-
-	// Simple and readable a3s logo
-	asciiArt := []string{
-		"        ____      ",
-		"       |___ \\     ",
-		"   __ _  __) |___ ",
-		"  / _` ||__ </ __|",
-		" | (_| |___) \\__ \\",
-		"  \\__,_|____/|___/",
-	}
-
-	// Format AWS identity information (left side, like k9s)
-	// Add padding to align with the main content border (2 spaces for border + 1 space for content padding)
-	leftPadding := "   " // 3 spaces to align with bordered content
-	var infoLines []string
-	if m.identity != nil {
-		infoLines = []string{
-			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Account:"), styles.HeaderValue.Render(m.identity.Account)),
-			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("User:"), styles.HeaderValue.Render(m.identity.DisplayName)),
-			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Region:"), styles.HeaderValue.Render(m.region)),
-		}
-		// Add profile if different from user
-		if m.profile != "" && m.profile != "default" {
-			infoLines = append(infoLines, fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Profile:"), styles.HeaderValue.Render(m.profile)))
-		}
-	} else {
-		infoLines = []string{
-			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Profile:"), styles.HeaderValue.Render(m.profile)),
-			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Region:"), styles.HeaderValue.Render(m.region)),
-		}
-	}
-
-	// Calculate dimensions for proper k9s-style layout
-	asciiWidth := 18  // Actual width of the ASCII art
-	rightPadding := 4 // Padding from right edge (like k9s)
-	minSpacing := 12  // Increased minimum spacing for better separation
-
-	// Find the maximum width of left content for consistent spacing
-	maxLeftWidth := 0
-	for _, line := range infoLines {
-		if w := lipgloss.Width(line); w > maxLeftWidth {
-			maxLeftWidth = w
-		}
-	}
-
-	// Calculate available space (account for terminal width and right padding)
-	availableWidth := m.width - rightPadding
-	totalRequiredWidth := maxLeftWidth + minSpacing + asciiWidth
-
-	// Calculate spacing - prioritize right-alignment like k9s
-	var spacing int
-	if totalRequiredWidth <= availableWidth {
-		// We have enough space - calculate spacing to right-align the ASCII art
-		spacing = availableWidth - maxLeftWidth - asciiWidth
-		// Ensure minimum spacing is maintained
-		if spacing < minSpacing {
-			spacing = minSpacing
-		}
-	} else {
-		// Terminal too narrow - use minimum spacing and let ASCII art overflow gracefully
-		spacing = minSpacing
-	}
-
-	// Combine info (left) and ASCII art (right) - k9s-style layout
-	maxLines := len(asciiArt)
-	if len(infoLines) > maxLines {
-		maxLines = len(infoLines)
-	}
-
-	for i := 0; i < maxLines; i++ {
-		var line strings.Builder
-
-		// Left side - AWS info
-		if i < len(infoLines) {
-			line.WriteString(infoLines[i])
-			// Pad to consistent width for alignment
-			currentWidth := lipgloss.Width(infoLines[i])
-			if padding := maxLeftWidth - currentWidth; padding > 0 {
-				line.WriteString(strings.Repeat(" ", padding))
-			}
-		} else {
-			// Empty left side - pad to max width
-			line.WriteString(strings.Repeat(" ", maxLeftWidth))
-		}
-
-		// Add calculated spacing to position ASCII art properly
-		line.WriteString(strings.Repeat(" ", spacing))
-
-		// Right side - ASCII art with consistent right alignment
-		if i < len(asciiArt) {
-			// Apply styling and ensure consistent positioning
-			artLine := styles.ASCIIArtStyle.Render(asciiArt[i])
-			line.WriteString(artLine)
-		}
-
-		header.WriteString(line.String())
-		header.WriteString("\n")
-	}
-
-	return strings.TrimRight(header.String(), "\n")
 }
 
 func truncate(s string, max int) string {

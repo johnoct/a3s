@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/johnoct/a3s/internal/aws/identity"
 )
 
 var (
@@ -206,4 +207,111 @@ func RenderHelp() string {
 		HelpKey.Render("?") + " " + HelpDesc.Render("help"),
 	}
 	return HelpStyle.Render(strings.Join(help, " | "))
+}
+
+// RenderHeader renders the application header with AWS identity information and ASCII art
+func RenderHeader(profile, region string, identity *identity.Identity, terminalWidth int) string {
+	var header strings.Builder
+
+	// Simple and readable a3s logo
+	asciiArt := []string{
+		"        ____      ",
+		"       |___ \\     ",
+		"   __ _  __) |___ ",
+		"  / _` ||__ </ __|",
+		" | (_| |___) \\__ \\",
+		"  \\__,_|____/|___/",
+	}
+
+	// Format AWS identity information (left side, like k9s)
+	// Add padding to align with the main content border
+	leftPadding := " " // Space to align with bordered content
+	var infoLines []string
+	if identity != nil {
+		infoLines = []string{
+			"\n",
+			"\n",
+			fmt.Sprintf("%s%s %s", leftPadding, HeaderKey.Render("Account:"), HeaderValue.Render(identity.Account)),
+			fmt.Sprintf("%s%s %s", leftPadding, HeaderKey.Render("User:"), HeaderValue.Render(identity.DisplayName)),
+			fmt.Sprintf("%s%s %s", leftPadding, HeaderKey.Render("Region:"), HeaderValue.Render(region)),
+		}
+		// Add profile if different from user
+		if profile != "" && profile != "default" {
+			infoLines = append(infoLines, fmt.Sprintf("%s%s %s", leftPadding, HeaderKey.Render("Profile:"), HeaderValue.Render(profile)))
+		}
+	} else {
+		infoLines = []string{
+			fmt.Sprintf("%s%s %s", leftPadding, HeaderKey.Render("Profile:"), HeaderValue.Render(profile)),
+			fmt.Sprintf("%s%s %s", leftPadding, HeaderKey.Render("Region:"), HeaderValue.Render(region)),
+		}
+	}
+
+	// Calculate dimensions for proper k9s-style layout
+	asciiWidth := 18  // Actual width of the ASCII art
+	rightPadding := 4 // Padding from right edge (like k9s)
+	minSpacing := 12  // Minimum spacing for better separation
+
+	// Find the maximum width of left content for consistent spacing
+	maxLeftWidth := 0
+	for _, line := range infoLines {
+		if w := lipgloss.Width(line); w > maxLeftWidth {
+			maxLeftWidth = w
+		}
+	}
+
+	// Calculate available space (account for terminal width and right padding)
+	availableWidth := terminalWidth - rightPadding
+	totalRequiredWidth := maxLeftWidth + minSpacing + asciiWidth
+
+	// Calculate spacing - prioritize right-alignment like k9s
+	var spacing int
+	if totalRequiredWidth <= availableWidth {
+		// We have enough space - calculate spacing to right-align the ASCII art
+		spacing = availableWidth - maxLeftWidth - asciiWidth
+		// Ensure minimum spacing is maintained
+		if spacing < minSpacing {
+			spacing = minSpacing
+		}
+	} else {
+		// Terminal too narrow - use minimum spacing and let ASCII art overflow gracefully
+		spacing = minSpacing
+	}
+
+	// Combine info (left) and ASCII art (right) - k9s-style layout
+	maxLines := len(asciiArt)
+	if len(infoLines) > maxLines {
+		maxLines = len(infoLines)
+	}
+
+	for i := 0; i < maxLines; i++ {
+		var line strings.Builder
+
+		// Left side - AWS info
+		if i < len(infoLines) {
+			line.WriteString(infoLines[i])
+			// Pad to consistent width for alignment
+			currentWidth := lipgloss.Width(infoLines[i])
+			if padding := maxLeftWidth - currentWidth; padding > 0 {
+				line.WriteString(strings.Repeat(" ", padding))
+			}
+		} else {
+			// Empty left side - pad to max width
+			line.WriteString(strings.Repeat(" ", maxLeftWidth))
+		}
+
+		// Add calculated spacing to position ASCII art properly
+		line.WriteString(strings.Repeat(" ", spacing))
+
+		// Right side - ASCII art with consistent right alignment
+		if i < len(asciiArt) {
+			// Apply styling and ensure consistent positioning
+			artLine := ASCIIArtStyle.Render(asciiArt[i])
+			line.WriteString(artLine)
+		}
+
+		header.WriteString(line.String())
+		header.WriteString("\n")
+	}
+
+	return strings.TrimRight(header.String(), "\n")
 }

@@ -14,19 +14,29 @@ import (
 	"github.com/johnoct/a3s/internal/ui/styles"
 )
 
+// DetailModel represents the detailed view of an IAM role
 type DetailModel struct {
-	role           *iam.Role
-	profile        string
-	region         string
-	identity       *identity.Identity
-	roleService    *iam.RoleService
-	width          int
-	height         int
-	scrollY        int
+	// Core role data
+	role        *iam.Role
+	roleService *iam.RoleService
+
+	// AWS context
+	profile  string
+	region   string
+	identity *identity.Identity
+
+	// Display dimensions
+	width  int
+	height int
+
+	// Navigation state
 	activeTab      int
 	tabs           []string
 	viewState      viewState
+	scrollY        int
 	selectedPolicy int
+
+	// Policy document viewing
 	policyDocument string
 	policyName     string
 	loadingPolicy  bool
@@ -53,10 +63,12 @@ type searchMatch struct {
 	text  string
 }
 
+// IsViewingPolicyDocument returns true if currently viewing a policy document
 func (m *DetailModel) IsViewingPolicyDocument() bool {
 	return m.viewState == viewPolicyDocument
 }
 
+// NewDetailModel creates a new DetailModel with the given role and configuration
 func NewDetailModel(role *iam.Role, profile, region string, roleService *iam.RoleService) *DetailModel {
 	searchInput := textinput.New()
 	searchInput.Placeholder = "Search..."
@@ -65,16 +77,16 @@ func NewDetailModel(role *iam.Role, profile, region string, roleService *iam.Rol
 
 	return &DetailModel{
 		role:        role,
+		roleService: roleService,
 		profile:     profile,
 		region:      region,
-		roleService: roleService,
 		tabs:        []string{"Overview", "Trust Policy", "Policies", "Tags"},
 		viewState:   viewNormal,
 		searchInput: searchInput,
 	}
 }
 
-// Message types for async policy loading
+// policyDocumentLoadedMsg represents the result of loading a policy document
 type policyDocumentLoadedMsg struct {
 	document   string
 	policyName string
@@ -85,6 +97,11 @@ func (m *DetailModel) Init() tea.Cmd {
 	return nil
 }
 
+// ============================================================================
+// Core Bubble Tea Methods
+// ============================================================================
+
+// SetIdentity sets the AWS identity for the detail model
 func (m *DetailModel) SetIdentity(id *identity.Identity) {
 	m.identity = id
 }
@@ -236,6 +253,10 @@ func (m *DetailModel) updateNormalView(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// ============================================================================
+// Async Operations
+// ============================================================================
+
 func (m *DetailModel) loadSelectedPolicy() tea.Cmd {
 	if m.loadingPolicy {
 		return nil
@@ -267,7 +288,10 @@ func (m *DetailModel) loadSelectedPolicy() tea.Cmd {
 	return nil
 }
 
-// Search functionality methods
+// ============================================================================
+// Search Functionality
+// ============================================================================
+
 func (m *DetailModel) enterSearchMode() {
 	m.searchMode = true
 	m.searchInput.Focus()
@@ -387,12 +411,13 @@ func (m *DetailModel) scrollToMatch() {
 	m.scrollY = targetScroll
 }
 
+// calculateVisibleHeight calculates the available height for content display
 func (m *DetailModel) calculateVisibleHeight() int {
 	const (
 		minHeight     = 5
-		borderPadding = 2 // Reduced from 4
-		headerHeight  = 8 // ASCII art (6 lines) + spacing (2) - accounting for top margin
-		baseUIHeight  = 6 // title(2) + tab(2) + status(1) + help(1) - reduced padding
+		borderPadding = 2 // Border top and bottom
+		headerHeight  = 6 // ASCII art lines
+		baseUIHeight  = 8 // title(2) + spacing(2) + tab(2) + status(1) + help(1)
 	)
 
 	calculatedHeight := m.height - headerHeight - baseUIHeight - borderPadding
@@ -401,6 +426,10 @@ func (m *DetailModel) calculateVisibleHeight() int {
 	}
 	return calculatedHeight
 }
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
 
 func max(a, b int) int {
 	if a > b {
@@ -416,6 +445,10 @@ func min(a, b int) int {
 	return b
 }
 
+// ============================================================================
+// View Rendering
+// ============================================================================
+
 func (m *DetailModel) View() string {
 	switch m.viewState {
 	case viewPolicyDocument:
@@ -430,7 +463,7 @@ func (m *DetailModel) renderPolicyDocumentView() string {
 	var fullView strings.Builder
 
 	// Header with logo and AWS identity (like list view) - no top margin needed
-	fullView.WriteString(m.renderHeader())
+	fullView.WriteString(styles.RenderHeader(m.profile, m.region, m.identity, m.width))
 	fullView.WriteString("\n")
 
 	// Title for policy document view - with left padding
@@ -444,7 +477,7 @@ func (m *DetailModel) renderPolicyDocumentView() string {
 			title = fmt.Sprintf("📄 Policy Document: %s...", m.policyName[:maxLen])
 		}
 	}
-	fullView.WriteString("   ") // 3 spaces to align with header
+	fullView.WriteString("") // 3 spaces to align with header
 	fullView.WriteString(styles.TitleStyle.Render(title))
 	fullView.WriteString("\n\n") // Extra line to match the spacing of tabs in normal view
 
@@ -452,10 +485,8 @@ func (m *DetailModel) renderPolicyDocumentView() string {
 	lines := strings.Split(m.policyDocument, "\n")
 	visibleHeight := m.calculateVisibleHeight()
 
-	// Adjust visible height if search mode is active (reserve space for search bar)
-	if m.searchMode {
-		visibleHeight -= 2
-	}
+	// Always reserve space for search bar to prevent layout shifts
+	visibleHeight -= 2
 
 	endIdx := m.scrollY + visibleHeight
 	if endIdx > len(lines) {
@@ -493,17 +524,20 @@ func (m *DetailModel) renderPolicyDocumentView() string {
 	// Apply code block styling and border
 	styledContent := styles.CodeBlock.Render(strings.TrimRight(content.String(), "\n"))
 	// Height calculation: visibleHeight + CodeBlock padding(top:1, bottom:1) = visibleHeight + 2
-	borderedContent := styles.GetMainContainer(m.width-2, visibleHeight+2).Render(styledContent)
-	fullView.WriteString("  ") // 2 spaces to align border properly
+	borderedContent := styles.GetMainContainer(m.width, visibleHeight+2).Render(styledContent)
 	fullView.WriteString(borderedContent)
 	fullView.WriteString("\n")
 
-	// Search bar (if in search mode)
+	// Search bar - always reserve space to prevent layout shifts
 	if m.searchMode {
 		searchBar := m.renderSearchBar()
 		fullView.WriteString(searchBar)
-		fullView.WriteString("\n")
+	} else {
+		// Render invisible search bar to maintain layout consistency
+		searchBarHeight := strings.Repeat(" ", m.width-2) // Match container width
+		fullView.WriteString(searchBarHeight)
 	}
+	fullView.WriteString("\n")
 
 	// Status bar
 	fullView.WriteString(styles.RenderStatusBar(m.profile, m.region, 1, m.width))
@@ -627,10 +661,10 @@ func (m *DetailModel) renderNormalView() string {
 	var fullView strings.Builder
 
 	// Header with logo and AWS identity (like list view) - no top margin needed
-	fullView.WriteString(m.renderHeader())
+	fullView.WriteString(styles.RenderHeader(m.profile, m.region, m.identity, m.width))
 	fullView.WriteString("\n")
 
-	// Title (outside the border) - with left padding to align with header
+	// Title (outside the border) - with consistent padding
 	title := fmt.Sprintf("🔍 Role: %s", m.role.Name)
 	fullView.WriteString("   ") // 3 spaces to align with header
 	fullView.WriteString(styles.TitleStyle.Render(title))
@@ -694,8 +728,8 @@ func (m *DetailModel) renderNormalView() string {
 	}
 
 	// Apply the border container to the content with dynamic sizing
-	borderedContent := styles.GetMainContainer(m.width-2, visibleHeight).Render(strings.TrimRight(content.String(), "\n"))
-	fullView.WriteString("  ") // 2 spaces to align border properly
+	borderedContent := styles.GetMainContainer(m.width, visibleHeight).Render(strings.TrimRight(content.String(), "\n"))
+	fullView.WriteString("") // 2 spaces to align border properly
 	fullView.WriteString(borderedContent)
 	fullView.WriteString("\n")
 
@@ -875,80 +909,4 @@ func (m *DetailModel) renderTags() string {
 	}
 
 	return s.String()
-}
-
-func (m *DetailModel) renderHeader() string {
-	var header strings.Builder
-
-	// Simple and readable a3s logo (same as list view)
-	asciiArt := []string{
-		"        ____      ",
-		"       |___ \\     ",
-		"   __ _  __) |___ ",
-		"  / _` ||__ </ __|",
-		" | (_| |___) \\__ \\",
-		"  \\__,_|____/|___/",
-	}
-
-	// Format AWS identity information (left side, like k9s)
-	// Add padding to align with the main content border (2 spaces for border + 1 space for content padding)
-	leftPadding := "   " // 3 spaces to align with bordered content
-	var infoLines []string
-	if m.identity != nil {
-		infoLines = []string{
-			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Account:"), styles.HeaderValue.Render(m.identity.Account)),
-			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("User:"), styles.HeaderValue.Render(m.identity.DisplayName)),
-			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Region:"), styles.HeaderValue.Render(m.region)),
-		}
-		// Add profile if different from user
-		if m.profile != "" && m.profile != "default" {
-			infoLines = append(infoLines, fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Profile:"), styles.HeaderValue.Render(m.profile)))
-		}
-	} else {
-		infoLines = []string{
-			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Profile:"), styles.HeaderValue.Render(m.profile)),
-			fmt.Sprintf("%s%s %s", leftPadding, styles.HeaderKey.Render("Region:"), styles.HeaderValue.Render(m.region)),
-		}
-	}
-
-	// Calculate dimensions for proper k9s-style layout
-	asciiWidth := 18  // Actual width of the ASCII art
-	rightPadding := 4 // Padding from right edge (like k9s)
-	minSpacing := 12  // Increased minimum spacing for better separation
-
-	// Find the maximum width of left content for consistent spacing
-	maxLeftWidth := 0
-	for _, line := range infoLines {
-		if w := lipgloss.Width(line); w > maxLeftWidth {
-			maxLeftWidth = w
-		}
-	}
-
-	// Calculate available space (account for terminal width and right padding)
-	availableWidth := m.width - rightPadding
-
-	// Calculate spacing between info and ASCII art
-	spacing := availableWidth - maxLeftWidth - asciiWidth
-	if spacing < minSpacing {
-		spacing = minSpacing
-	}
-
-	// Build the header with AWS info on the left and ASCII art on the right
-	for i := 0; i < 6; i++ {
-		if i < len(infoLines) {
-			// Calculate padding for this specific line
-			lineWidth := lipgloss.Width(infoLines[i])
-			currentSpacing := availableWidth - lineWidth - asciiWidth
-			if currentSpacing < minSpacing {
-				currentSpacing = minSpacing
-			}
-			header.WriteString(infoLines[i] + strings.Repeat(" ", currentSpacing) + styles.ASCIIArtStyle.Render(asciiArt[i]))
-		} else {
-			// No info line, just the ASCII art aligned to the right
-			header.WriteString(strings.Repeat(" ", maxLeftWidth+spacing) + styles.ASCIIArtStyle.Render(asciiArt[i]))
-		}
-		header.WriteString("\n")
-	}
-
-	return header.String()
 }
