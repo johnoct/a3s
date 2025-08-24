@@ -345,10 +345,6 @@ func (m ListModel) View() string {
 	fullView.WriteString(borderedContent)
 	fullView.WriteString("\n")
 
-	// Status bar (outside the border) with full width
-	fullView.WriteString(styles.RenderStatusBar(m.profile, m.region, len(m.filteredRoles), m.width))
-	fullView.WriteString("\n")
-
 	// Help line (outside the border)
 	fullView.WriteString(styles.RenderHelp())
 

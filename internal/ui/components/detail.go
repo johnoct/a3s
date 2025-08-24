@@ -539,10 +539,6 @@ func (m *DetailModel) renderPolicyDocumentView() string {
 	}
 	fullView.WriteString("\n")
 
-	// Status bar
-	fullView.WriteString(styles.RenderStatusBar(m.profile, m.region, 1, m.width))
-	fullView.WriteString("\n")
-
 	// Help for policy document view
 	help := m.getPolicyDocumentHelp()
 	fullView.WriteString(styles.HelpStyle.Render(strings.Join(help, " | ")))
@@ -731,10 +727,6 @@ func (m *DetailModel) renderNormalView() string {
 	borderedContent := styles.GetMainContainer(m.width, visibleHeight).Render(strings.TrimRight(content.String(), "\n"))
 	fullView.WriteString("") // 2 spaces to align border properly
 	fullView.WriteString(borderedContent)
-	fullView.WriteString("\n")
-
-	// Status bar (outside the border) with full width
-	fullView.WriteString(styles.RenderStatusBar(m.profile, m.region, 1, m.width))
 	fullView.WriteString("\n")
 
 	// Help (outside the border)
