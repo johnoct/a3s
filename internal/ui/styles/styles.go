@@ -215,12 +215,10 @@ func RenderHeader(profile, region string, identity *identity.Identity, terminalW
 
 	// Simple and readable a3s logo
 	asciiArt := []string{
-		"        ____      ",
-		"       |___ \\     ",
-		"   __ _  __) |___ ",
-		"  / _` ||__ </ __|",
-		" | (_| |___) \\__ \\",
-		"  \\__,_|____/|___/",
+		"   __ _  _____  ___ ",
+		"  / _` ||___ / / __|",
+		" | (_| | |_ \\ \\__ \\",
+		"  \\__,_||___/ |___/",
 	}
 
 	// Format AWS identity information (left side, like k9s)
@@ -229,8 +227,6 @@ func RenderHeader(profile, region string, identity *identity.Identity, terminalW
 	var infoLines []string
 	if identity != nil {
 		infoLines = []string{
-			"\n",
-			"\n",
 			fmt.Sprintf("%s%s %s", leftPadding, HeaderKey.Render("Account:"), HeaderValue.Render(identity.Account)),
 			fmt.Sprintf("%s%s %s", leftPadding, HeaderKey.Render("User:"), HeaderValue.Render(identity.DisplayName)),
 			fmt.Sprintf("%s%s %s", leftPadding, HeaderKey.Render("Region:"), HeaderValue.Render(region)),
@@ -247,7 +243,7 @@ func RenderHeader(profile, region string, identity *identity.Identity, terminalW
 	}
 
 	// Calculate dimensions for proper k9s-style layout
-	asciiWidth := 18  // Actual width of the ASCII art
+	asciiWidth := 19  // Actual width of the ASCII art
 	rightPadding := 4 // Padding from right edge (like k9s)
 	minSpacing := 12  // Minimum spacing for better separation
 
