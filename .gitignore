@@ -36,3 +36,6 @@ go.work
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# VHS demo files (keep source tape as development artifact)
+*.tape

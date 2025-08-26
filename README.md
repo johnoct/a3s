@@ -6,19 +6,34 @@
 ![AWS SDK](https://img.shields.io/badge/AWS%20SDK-v2-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
+## Demo
+
+![a3s Demo](demo.gif)
+
+**What you'll see in this demo:**
+- 🎨 Beautiful k9s-inspired interface with AWS identity display and ASCII art logo
+- 📋 Navigate through IAM roles using vim-like j/k keys
+- 🔍 Real-time search filtering with `/` command (searching for "lambda" and "service")
+- 📄 Detailed role views with tabbed interface (Overview, Trust Policy, Policies, Tags)
+- 📜 Interactive policy document viewer with full JSON display
+- ⌨️ Seamless navigation: Tab between sections, Enter to view details, ESC to navigate back
+- 🏃 Responsive async loading for all AWS API calls
+
 ## Features
 
 ### MVP - IAM Role Viewer
 - 📋 **List all IAM roles** with sortable columns
-- 🔍 **Real-time search** filtering  
-- 📄 **Detailed role view** with:
-  - Trust relationships
-  - Attached managed and inline policies
-  - Tags and metadata
-  - Last usage information
-- ⌨️ **Vim-like keyboard navigation**
+- 🔍 **Real-time search** filtering with `/` command
+- 📄 **Detailed role view** with tabbed interface:
+  - **Overview**: Role metadata and last usage information
+  - **Trust Policy**: Trust relationships and assume role policies
+  - **Policies**: Attached managed and inline policies with interactive JSON viewer
+  - **Tags**: Role tags and metadata
+- 📜 **Interactive policy document viewer** - select any policy to view full JSON with navigation
+- ⌨️ **Vim-like keyboard navigation** (j/k, g/G, Tab, Enter, ESC)
 - 🔄 **AWS profile and region switching**
-- 🎨 **Beautiful TUI** with AWS-themed colors
+- 🎨 **Beautiful k9s-inspired TUI** with AWS identity display and consistent styling
+- ⚡ **Async loading** with loading indicators for responsive performance
 
 ## Installation
 
@@ -77,9 +92,17 @@ a3s -profile dev -region eu-west-1
 |-----|--------|
 | `Tab`/`l` | Next tab |
 | `Shift+Tab`/`h` | Previous tab |
-| `j`/`k` | Scroll content |
+| `j`/`k` | Scroll content or navigate policies |
 | `g`/`G` | Go to top/bottom |
-| `Esc` | Back to list |
+| `Enter` | View selected policy document (in Policies tab) |
+| `Esc` | Back to list or previous view |
+
+#### Policy Document View
+| Key | Action |
+|-----|--------|
+| `j`/`k` | Scroll up/down |
+| `g`/`G` | Go to top/bottom of document |
+| `Esc` | Back to policies tab |
 
 ## Configuration
 
@@ -96,7 +119,7 @@ a3s uses standard AWS credential resolution:
 
 ### Required IAM Permissions
 
-For the MVP (IAM role viewer), you need:
+For the MVP (IAM role viewer with interactive policy document viewing), you need:
 
 ```json
 {
@@ -110,7 +133,10 @@ For the MVP (IAM role viewer), you need:
         "iam:ListRoleTags",
         "iam:ListAttachedRolePolicies",
         "iam:ListRolePolicies",
-        "iam:GetRolePolicy"
+        "iam:GetRolePolicy",
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion",
+        "sts:GetCallerIdentity"
       ],
       "Resource": "*"
     }
